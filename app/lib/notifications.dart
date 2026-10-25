@@ -18,6 +18,14 @@ import 'prayer.dart';
 /// at most 30 seconds on iPhone). Without it the normal notification sound plays.
 const adhanSoundBundled = bool.fromEnvironment('ADHAN_SOUND');
 
+/// A one-off reminder, e.g. the evening before a test.
+class ScheduledReminder {
+  const ScheduledReminder(this.at, this.title, this.body);
+  final DateTime at;
+  final String title;
+  final String body;
+}
+
 class Notifications {
   static final _plugin = FlutterLocalNotificationsPlugin();
   static bool _ready = false;
@@ -57,9 +65,28 @@ class Notifications {
   static Future<void> schedulePrayers(
     PrayerSettings settings, {
     required bool enabled,
+    List<ScheduledReminder> reminders = const [],
   }) async {
     if (!await _init()) return;
     await _plugin.cancelAll();
+    var reminderId = 100;
+    for (final r in reminders.take(20)) {
+      await _plugin.zonedSchedule(
+        id: reminderId++,
+        scheduledDate: tz.TZDateTime.from(r.at, tz.local),
+        notificationDetails: const NotificationDetails(
+          android: AndroidNotificationDetails(
+            'school',
+            'School reminders',
+            channelDescription: 'Tests and competitions',
+          ),
+          iOS: DarwinNotificationDetails(),
+        ),
+        androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+        title: r.title,
+        body: r.body,
+      );
+    }
     if (!enabled) return;
 
     final details = NotificationDetails(

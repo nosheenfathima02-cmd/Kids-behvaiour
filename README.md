@@ -13,8 +13,8 @@ A weekday routine app for Muslim families. Kids tick off their jobs (salah, home
 | Stage | What | Status |
 |---|---|---|
 | 1 | Core app: Mom and Kid modes, several kids with themes, routine with time windows, kids tick / Mom edits, stars, time-outs, rewards, Monday reset, prayer times by city, daily reminder, Qur'an tracker, sunnah fast bonus | Done |
-| 2 | Cloud: parent sign-in (Google, Apple, email), QR linking of each child's device, live sync, server-side security rules, prayer-time reminders, push notifications to Mom | **Done** (needs your Firebase project to go live) |
-| 3 | School: Google Classroom import, competition reminders | Next |
+| 2 | Cloud: parent sign-in (Google, Apple, email), QR linking of each child's device, live sync, server-side security rules, prayer-time reminders, push notifications to Mom | Done (needs your Firebase project to go live) |
+| 3 | School: homework and tests as tasks, Google Classroom import, competitions with practice tasks and reminders, exam-week focus timer | **Done** |
 | 4 | Testing, privacy policy, Google Play and App Store release | Needs your developer accounts |
 
 ## How it works
@@ -31,6 +31,13 @@ A weekday routine app for Muslim families. Kids tick off their jobs (salah, home
 - Mom can remove a device at any time; it loses access immediately.
 
 **The week** is named after its Monday. Stars stay visible over the weekend; on Monday Mom's phone saves a one-line summary per child and deletes last week's ticks.
+
+**School (Stage 3).** In the parent app's School tab Mom adds homework, tests and competitions, or imports them from Google Classroom.
+- Homework and tests become a study task on the school day before they are due (Mom can pick another day). They count towards stars like any other task.
+- A competition shows a countdown on the child's screen and can add a daily practice task until the big day; each tick is one practice session towards the goal (e.g. 6 of 10).
+- Children get a reminder the evening before a test or competition, and on the competition morning.
+- Exam week mode shows a 25-minute study timer with 5-minute breaks.
+- Google Classroom: Mom taps "Connect school account" and signs in with the child's school Google account. Super Mom reads courses and the child's own classwork only (read-only), imports anything due in the next 2 weeks that is not handed in yet, and never stores the school account's password or token. Many schools block outside apps on student accounts; then the school's Google admin has to allow Super Mom, or Mom adds homework by hand.
 
 ## Rules for stars
 
@@ -56,6 +63,8 @@ A weekday routine app for Muslim families. Kids tick off their jobs (salah, home
 5. Optional, for "Aisha ticked a task" notifications on Mom's phone: upgrade the project to the **Blaze** plan (pay as you go; a family stays inside the free allowance, but Google asks for a card), then `cd firebase/functions && npm install && cd ../.. && firebase deploy --only functions`. On iPhone this also needs an APNs key uploaded in Firebase → Project settings → Cloud Messaging.
 6. iPhone only, in Xcode (`app/ios/Runner.xcworkspace`) → Signing & Capabilities: add **Sign in with Apple** and **Push Notifications**. For Google sign-in on iPhone, add the `REVERSED_CLIENT_ID` from `GoogleService-Info.plist` as a URL scheme.
 
+7. Google Classroom (optional). In the Google Cloud console for the same project: enable the **Google Classroom API**; under **OAuth consent screen** add the scopes `classroom.courses.readonly` and `classroom.coursework.me.readonly`, and add your children's school accounts as **test users** (until Google verifies the app, which it requires before the public launch). On Android, add your app's SHA-1 fingerprint in Firebase → Project settings → Your apps, then run `flutterfire configure` again. If sign-in says "cancelled" right after picking an account, the SHA-1 or package name is usually wrong.
+
 **Adhan sound.** Reminders use the normal notification sound. To play an adhan, add a recording you have the rights to as `app/android/app/src/main/res/raw/adhan.mp3` and `app/ios/Runner/adhan.caf` (30 seconds at most on iPhone) and build with `--dart-define=ADHAN_SOUND=true`.
 
 ## Run and test
@@ -77,7 +86,7 @@ cd app && flutter run -d chrome --dart-define=USE_EMULATOR=true
 
 Security rules tests: `cd firebase/rules-tests && npm install && npm test`.
 
-Two-device test (Mom + child's tablet in two browsers): build with `flutter build web --dart-define=USE_EMULATOR=true`, serve `app/build/web` on port 8765, start the emulators, then `node app/e2e/two_devices.js` (needs Playwright).
+Two-device tests (Mom + child's tablet in two browsers): build with `flutter build web --dart-define=USE_EMULATOR=true`, serve `app/build/web` on port 8765, start the emulators, then `node app/e2e/two_devices.js` (linking, ticking, unlinking) and `node app/e2e/school.js` (competition, homework tick). Both need Playwright.
 
 ## Known limits
 

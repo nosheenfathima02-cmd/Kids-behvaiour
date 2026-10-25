@@ -70,7 +70,7 @@ const shot = (p, f) => p.screenshot({ path: `${__dirname}/screenshots/${f}` });
     await shot(mom, 'e6-mom-linked.png');
 
     step('aisha ticks an open task');
-    await tap(kid, 'Mark done');
+    await tap(kid, /^Mark done/);
     await kid.waitForTimeout(2500);
     await shot(kid, 'e7-kid-ticked.png');
 

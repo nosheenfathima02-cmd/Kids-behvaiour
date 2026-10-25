@@ -73,23 +73,46 @@ service cloud.firestore {
       );
     }
 
-    // key looks like "3:homework" (weekday 3 = Wednesday).
+    // key looks like "3:homework" (weekday 3 = Wednesday). The task is either
+    // part of the weekly routine, or a school item (homework, test revision,
+    // competition practice) whose id starts with "s_".
     function kidMayChange(fid, kidId, key) {
       let fam = familyDoc(fid);
       let t = localNow(fid);
       let parts = key.split(':');
-      let taskId = parts[1];
-      let task = fam.routine[taskId];
       let minute = t.hours() * 60 + t.minutes();
       return parts.size() == 2
         && parts[0] == string(t.dayOfWeek())
-        && taskId in fam.routine
-        && t.dayOfWeek() in task.weekdays
+        && (routineTaskOk(fam, kidId, parts[1], t, minute) || schoolTaskOk(fam, kidId, parts[1], t, minute));
+    }
+
+    function routineTaskOk(fam, kidId, taskId, t, minute) {
+      return taskId in fam.routine && routineWindowOk(fam, fam.routine[taskId], kidId, t, minute);
+    }
+
+    function routineWindowOk(fam, task, kidId, t, minute) {
+      return t.dayOfWeek() in task.weekdays
         && (task.get('kidIds', null) == null || kidId in task.kidIds)
         && (
           (task.get('prayer', null) == null && minute >= task.startMin && minute <= task.endMin + graceMinutes())
           || (task.get('prayer', null) != null && prayerWindowOk(fam, task.prayer, ymd(t), minute))
         );
+    }
+
+    function schoolTaskOk(fam, kidId, taskId, t, minute) {
+      return taskId in fam.get('schoolItems', {}) && schoolWindowOk(fam.schoolItems[taskId], kidId, t, minute);
+    }
+
+    // On a school day between fromYmd and toYmd, inside the item's time window.
+    function schoolWindowOk(item, kidId, t, minute) {
+      return item.kidId == kidId
+        && item.get('fromYmd', null) is string
+        && item.get('toYmd', null) is string
+        && ymd(t) >= item.fromYmd
+        && ymd(t) <= item.toYmd
+        && t.dayOfWeek() <= 5
+        && minute >= item.startMin
+        && minute <= item.endMin + graceMinutes();
     }
 
     // One tick added (value "kid") or one of the child's own ticks removed.

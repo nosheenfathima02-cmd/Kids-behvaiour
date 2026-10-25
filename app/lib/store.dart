@@ -8,6 +8,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'classroom.dart';
 import 'content.dart';
 import 'logic.dart';
 import 'models.dart';
@@ -143,16 +144,29 @@ class AppStore extends ChangeNotifier {
 
   Kid? kidById(String id) => family.kids.where((k) => k.id == id).firstOrNull;
 
+  /// The weekly routine plus this week's homework, tests and competition practice.
+  List<RoutineTask> get allTasks => [
+    ...family.routine,
+    ...schoolTasks(family.schoolItems, currentWeekId),
+  ];
+
+  /// Upcoming homework, tests and competitions for one child, soonest first.
+  List<SchoolItem> schoolItemsFor(Kid kid) =>
+      family.schoolItems
+          .where((i) => i.kidId == kid.id && daysUntil(i.dueYmd, now) >= 0)
+          .toList()
+        ..sort((a, b) => a.dueYmd.compareTo(b.dueYmd));
+
   List<RoutineTask> tasksForDay(Kid kid, int weekday) =>
-      tasksFor(kid, family.routine, weekday, prayersToday);
+      tasksFor(kid, allTasks, weekday, prayersToday);
   TaskStatus status(Kid kid, RoutineTask t, int weekday) =>
       statusOf(kid, t, weekday, todayWeekday, nowMinute, prayersToday);
   bool canKidToggle(Kid kid, RoutineTask t) =>
       kidCanToggle(kid, t, todayWeekday, todayWeekday, nowMinute, prayersToday);
   WeekScore score(Kid kid) =>
-      weekScore(kid, family.routine, todayWeekday, prayersToday);
+      weekScore(kid, allTasks, todayWeekday, prayersToday);
   int starsForDay(Kid kid, int weekday) =>
-      dayStars(kid, family.routine, weekday, todayWeekday, prayersToday);
+      dayStars(kid, allTasks, weekday, todayWeekday, prayersToday);
   TimeWindow window(RoutineTask t) => windowOf(t, prayersToday);
 
   DocumentReference<Map<String, dynamic>> get _familyRef =>
@@ -570,13 +584,16 @@ class AppStore extends ChangeNotifier {
   /// weekly reset, time zone and salah windows for the security rules.
   void _maintain() {
     final today = ymdKey(now);
+    final reminders = _schoolReminders();
     final schedKey =
-        '$today|${family.adhanEnabled}|${jsonEncode(family.prayer.toJson())}';
+        '$today|${family.adhanEnabled}|${jsonEncode(family.prayer.toJson())}|'
+        '${reminders.map((r) => '${r.at}${r.title}').join()}';
     if (_scheduledFor != schedKey) {
       _scheduledFor = schedKey;
       Notifications.schedulePrayers(
         family.prayer,
         enabled: family.adhanEnabled,
+        reminders: reminders,
       );
     }
     if (!isParent || _maintainedDay == today) return;
@@ -770,6 +787,90 @@ class AppStore extends ChangeNotifier {
     );
   }
 
+  /// Tests and competitions: a reminder the evening before, and on the
+  /// morning of a competition.
+  List<ScheduledReminder> _schoolReminders() {
+    final kids = visibleKids.map((k) => k.id).toSet();
+    final out = <ScheduledReminder>[];
+    for (final i in family.schoolItems) {
+      if (!kids.contains(i.kidId) || i.kind == SchoolKind.homework) continue;
+      final day = dateFromYmd(i.dueYmd);
+      final name = kidById(i.kidId)?.name ?? '';
+      final what = i.kind == SchoolKind.test
+          ? '${i.subject.isEmpty ? '' : '${i.subject} '}test: ${i.title}'
+          : i.title;
+      out.add(
+        ScheduledReminder(
+          day.subtract(const Duration(hours: 6)),
+          'Tomorrow: $what',
+          'Bismillah, $name. Get ready tonight and sleep early.',
+        ),
+      );
+      if (i.kind == SchoolKind.event) {
+        out.add(
+          ScheduledReminder(
+            day.add(const Duration(hours: 7)),
+            'Today: ${i.title}',
+            'Good luck, $name! Say Bismillah and do your best.',
+          ),
+        );
+      }
+    }
+    return out.where((r) => r.at.isAfter(now)).toList();
+  }
+
+  void upsertSchoolItem(SchoolItem item) {
+    final i = family.schoolItems.indexWhere((x) => x.id == item.id);
+    i >= 0 ? family.schoolItems[i] = item : family.schoolItems.add(item);
+    _write(
+      _familyRef.update({
+        FieldPath(['schoolItems', item.id]): item.toJson(),
+      }),
+    );
+    notifyListeners();
+  }
+
+  void deleteSchoolItem(SchoolItem item) {
+    family.schoolItems.removeWhere((x) => x.id == item.id);
+    _write(
+      _familyRef.update({
+        FieldPath(['schoolItems', item.id]): FieldValue.delete(),
+      }),
+    );
+    notifyListeners();
+  }
+
+  String newSchoolItemId() => 's_${_newId()}';
+
+  /// Imports a child's upcoming Google Classroom work as homework and tests.
+  /// Returns a message for the parent.
+  Future<String> syncClassroom(Kid kid) async {
+    try {
+      final result = await ClassroomClient.fetch(now);
+      final updates = <Object, Object?>{};
+      var added = 0;
+      for (final w in result.work) {
+        final existing = family.schoolItems
+            .where((x) => x.id == w.itemId)
+            .firstOrNull;
+        if (existing == null) added++;
+        final item = schoolItemFor(w, kid.id, now, existing: existing);
+        updates[FieldPath(['schoolItems', item.id])] = item.toJson();
+      }
+      if (updates.isNotEmpty) await _familyRef.update(updates);
+      kid.classroomEmail = result.email;
+      saveKid(kid);
+      if (result.work.isEmpty) {
+        return 'No Classroom work due in the next 2 weeks for ${result.email}.';
+      }
+      return '${result.work.length} item${result.work.length == 1 ? '' : 's'} from Classroom ($added new).';
+    } on ClassroomException catch (e) {
+      return e.message;
+    } catch (e) {
+      return 'Classroom sync did not work: $e';
+    }
+  }
+
   void deleteTask(RoutineTask t) {
     _write(
       _familyRef.update({
@@ -806,6 +907,7 @@ class AppStore extends ChangeNotifier {
           d.data()['kidId'] as String: d.data(),
     };
     final summary = <String, int>{};
+    final practiceAdds = <String, int>{};
     for (final k in family.kids) {
       final copy = Kid.fromJson({
         ...k.toJson(),
@@ -814,10 +916,19 @@ class AppStore extends ChangeNotifier {
       })..applyWeek(oldWeek[k.id]);
       summary[k.name] = weekScore(
         copy,
-        family.routine,
+        [...family.routine, ...schoolTasks(family.schoolItems, oldWeekId)],
         scoreDay,
         prayersToday,
       ).total;
+      // Competition practice from that week counts towards the target.
+      for (final item in family.schoolItems.where(
+        (i) => i.kidId == k.id && i.kind == SchoolKind.event,
+      )) {
+        final ticks = practiceTicksThisWeek(copy, item);
+        if (ticks > 0) {
+          practiceAdds[item.id] = (practiceAdds[item.id] ?? 0) + ticks;
+        }
+      }
     }
     final history = [
       WeekSummary(oldWeekId, summary),
@@ -835,6 +946,19 @@ class AppStore extends ChangeNotifier {
     for (final k in family.kids) {
       batch.update(_familyRef.collection('kids').doc(k.id), {'ayahDone': 0});
     }
+    final schoolUpdates = <Object, Object?>{};
+    final cutoff = ymdKey(now.subtract(const Duration(days: 7)));
+    for (final item in family.schoolItems) {
+      final path = FieldPath(['schoolItems', item.id]);
+      if (item.dueYmd.compareTo(cutoff) < 0) {
+        schoolUpdates[path] =
+            FieldValue.delete(); // finished more than a week ago
+      } else if (practiceAdds.containsKey(item.id)) {
+        schoolUpdates[FieldPath(['schoolItems', item.id, 'practiceDone'])] =
+            item.practiceDone + practiceAdds[item.id]!;
+      }
+    }
+    if (schoolUpdates.isNotEmpty) batch.update(_familyRef, schoolUpdates);
     await batch.commit();
   }
 

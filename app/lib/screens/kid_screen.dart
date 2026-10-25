@@ -8,6 +8,7 @@ import '../prayer.dart';
 import '../store.dart';
 import '../widgets.dart';
 import 'mom_screen.dart';
+import 'school_screens.dart';
 
 /// The lock button on the kids' screens.
 Future<void> openParentArea(BuildContext context) async {
@@ -181,7 +182,9 @@ class KidHome extends StatelessWidget {
                     if (!store.isWeekend) ...[
                       const SizedBox(height: 12),
                       _JobsCard(kid: kid, store: store),
+                      if (kid.examMode) const FocusTimerCard(),
                     ],
+                    KidSchoolCard(kid: kid),
                     const SizedBox(height: 12),
                     _QuranCard(kid: kid),
                     const SizedBox(height: 12),
@@ -425,7 +428,9 @@ class _JobTile extends StatelessWidget {
         width: 48,
         height: 48,
         child: IconButton.filledTonal(
-          tooltip: canToggle ? (done ? 'Untick' : 'Mark done') : 'Locked',
+          tooltip: canToggle
+              ? (done ? 'Untick: ${task.title}' : 'Mark done: ${task.title}')
+              : 'Locked: ${task.title}',
           style: IconButton.styleFrom(
             backgroundColor: done ? const Color(0xFF23824F) : null,
             disabledBackgroundColor: done

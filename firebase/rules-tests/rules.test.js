@@ -22,8 +22,13 @@ import {
 const FID = 'fam1';
 let env;
 
-// The tests run in UTC (tzOffsetMin 0) and build time windows around "now".
-const now = new Date();
+// Time windows are built around "now". On a weekend the test family gets a
+// time zone 1-2 days ahead, so its local "now" is a Monday (school tasks
+// only open on school days).
+const utcNow = new Date();
+const utcDow = ((utcNow.getUTCDay() + 6) % 7) + 1;
+const TZ = utcDow > 5 ? (8 - utcDow) * 1440 : 0;
+const now = new Date(utcNow.getTime() + TZ * 60000);
 const nowMin = now.getUTCHours() * 60 + now.getUTCMinutes();
 const dow = ((now.getUTCDay() + 6) % 7) + 1; // 1 = Monday
 const ymd = (d) => String(d.getUTCFullYear() * 10000 + (d.getUTCMonth() + 1) * 100 + d.getUTCDate());
@@ -40,6 +45,16 @@ const routine = {
   yusufOnly: { title: 'Spelling', startMin: 0, endMin: 1439, weekdays: allDays, kidIds: ['yusuf'] },
   asr: { title: 'Pray Asr', prayer: 'asr', weekdays: allDays },
   fajr: { title: 'Pray Fajr', prayer: 'fajr', weekdays: allDays },
+};
+
+const tomorrow = ymd(new Date(now.getTime() + 86400000));
+const school = (kidId, from, to, start, end) => ({ kidId, kind: 'homework', title: 'Maths p.42', dueYmd: to ?? ymd(now), fromYmd: from, toYmd: to, startMin: start, endMin: end });
+const schoolItems = {
+  s_today: school('aisha', ymd(now), ymd(now), Math.max(0, nowMin - 30), Math.min(1439, nowMin + 30)),
+  s_tomorrow: school('aisha', tomorrow, tomorrow, 0, 1439),
+  s_yusuf: school('yusuf', ymd(now), ymd(now), 0, 1439),
+  s_closed: school('aisha', ymd(now), ymd(now), closedWindow[0], closedWindow[1]),
+  s_reminderOnly: school('aisha', null, null, 0, 1439),
 };
 
 const mom = () => env.authenticatedContext('mom', { firebase: { sign_in_provider: 'google.com' } }).firestore();
@@ -68,7 +83,7 @@ beforeEach(async () => {
     pw[4] = Math.max(0, nowMin - 10); pw[5] = nowMin + 10; // Asr open now
     pw[0] = closedWindow[0]; pw[1] = closedWindow[1]; // Fajr not open
     await setDoc(doc(db, `families/${FID}`), {
-      parents: ['mom'], tzOffsetMin: 0, routine, prayerWindows: { [ymd(now)]: pw }, prayer: { city: 'Dubai' },
+      parents: ['mom'], tzOffsetMin: TZ, routine, schoolItems, prayerWindows: { [ymd(now)]: pw }, prayer: { city: 'Dubai' },
     });
     await setDoc(doc(db, `families/${FID}/kids/aisha`), { name: 'Aisha', rewards: [{ name: 'Park', stars: 10 }, { name: 'Dinner', stars: 8 }] });
     await setDoc(doc(db, `families/${FID}/kids/yusuf`), { name: 'Yusuf', rewards: [] });
@@ -237,5 +252,24 @@ describe("a child's device", () => {
     const db = aishaTablet();
     await assertFails(updateDoc(doc(db, `families/${FID}`), { 'routine.closed.endMin': 1439 }));
     await assertFails(updateDoc(doc(db, `families/${FID}/kids/aisha`), { rewards: [] }));
+  });
+});
+
+describe('school items (homework, tests, competitions)', () => {
+  test("a child can tick today's homework while it is open", async () => {
+    await assertSucceeds(tick(aishaTablet(), 's_today'));
+  });
+
+  test("but not tomorrow's, a closed one, a brother's, or a reminder", async () => {
+    await assertFails(tick(aishaTablet(), 's_tomorrow'));
+    await assertFails(tick(aishaTablet(), 's_closed'));
+    await assertFails(tick(aishaTablet(), 's_yusuf'));
+    await assertFails(tick(aishaTablet(), 's_reminderOnly'));
+    await assertFails(tick(aishaTablet(), 's_madeUp'));
+  });
+
+  test('only parents can add or move homework', async () => {
+    await assertFails(updateDoc(doc(aishaTablet(), `families/${FID}`), { 'schoolItems.s_tomorrow.fromYmd': ymd(now) }));
+    await assertSucceeds(updateDoc(doc(mom(), `families/${FID}`), { 'schoolItems.s_new': school('aisha', tomorrow, tomorrow, 0, 600) }));
   });
 });

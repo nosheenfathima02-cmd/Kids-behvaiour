@@ -7,6 +7,7 @@ import '../store.dart';
 import '../widgets.dart';
 import 'editors.dart';
 import 'kid_screen.dart';
+import 'school_screens.dart';
 
 /// Parent area, opened with the PIN.
 class MomScreen extends StatefulWidget {
@@ -34,6 +35,9 @@ class _MomScreenState extends State<MomScreen> {
       kid == null
           ? const _NoKids()
           : _WeekTab(kid: kid, onKid: (k) => setState(() => _kidId = k.id)),
+      kid == null
+          ? const _NoKids()
+          : SchoolTab(kid: kid, onKid: (k) => setState(() => _kidId = k.id)),
       const FamilyTab(),
       const RoutineTab(),
     ];
@@ -76,6 +80,10 @@ class _MomScreenState extends State<MomScreen> {
             label: 'Week',
           ),
           NavigationDestination(
+            icon: Icon(Icons.school_outlined),
+            label: 'School',
+          ),
+          NavigationDestination(
             icon: Icon(Icons.family_restroom),
             label: 'Kids',
           ),
@@ -93,8 +101,8 @@ class _NoKids extends StatelessWidget {
       const Center(child: Text('Add a child in the Kids tab.'));
 }
 
-class _KidSelector extends StatelessWidget {
-  const _KidSelector({required this.selected, required this.onKid});
+class KidSelector extends StatelessWidget {
+  const KidSelector({super.key, required this.selected, required this.onKid});
   final Kid selected;
   final ValueChanged<Kid> onKid;
 
@@ -169,7 +177,7 @@ class _TodayTabState extends State<_TodayTab> {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        _KidSelector(selected: kid, onKid: widget.onKid),
+        KidSelector(selected: kid, onKid: widget.onKid),
         const SizedBox(height: 12),
         SectionCard(
           title: '${kid.name} this week',
@@ -276,7 +284,7 @@ class _WeekTab extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        _KidSelector(selected: kid, onKid: onKid),
+        KidSelector(selected: kid, onKid: onKid),
         const SizedBox(height: 12),
         SectionCard(
           title: 'Stars by day',

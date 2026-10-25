@@ -146,6 +146,7 @@ class Kid {
     this.surahName = 'Al-Ikhlas (112)',
     this.ayahDone = 0,
     this.ayahTotal = 4,
+    this.classroomEmail,
     List<Reward>? rewards,
     this.wishIndex,
     Map<String, DoneBy>? checks,
@@ -164,6 +165,9 @@ class Kid {
   String surahName;
   int ayahDone;
   int ayahTotal;
+
+  /// The school Google account last used to import from Google Classroom.
+  String? classroomEmail;
 
   List<Reward> rewards;
   int? wishIndex;
@@ -190,6 +194,7 @@ class Kid {
     ayahDone = o.ayahDone;
     ayahTotal = o.ayahTotal;
     rewards = o.rewards;
+    classroomEmail = o.classroomEmail;
   }
 
   /// The fields that stay from week to week (families/{fid}/kids/{id}).
@@ -215,6 +220,7 @@ class Kid {
     'surahName': surahName,
     'ayahDone': ayahDone,
     'ayahTotal': ayahTotal,
+    'classroomEmail': classroomEmail,
     'rewards': rewards.map((r) => r.toJson()).toList(),
     'wishIndex': wishIndex,
     'checks': checks.map((k, v) => MapEntry(k, v.name)),
@@ -230,6 +236,7 @@ class Kid {
     surahName: j['surahName'] as String? ?? '',
     ayahDone: j['ayahDone'] as int? ?? 0,
     ayahTotal: j['ayahTotal'] as int? ?? 1,
+    classroomEmail: j['classroomEmail'] as String?,
     rewards: ((j['rewards'] as List?) ?? [])
         .map((e) => Reward.fromJson(asMap(e)))
         .toList(),
@@ -275,6 +282,101 @@ class PrayerSettings {
 }
 
 /// Result of a finished week, kept so Mom can look back.
+enum SchoolKind { homework, test, event }
+
+/// Homework, a test, or a competition. Homework and tests become a study
+/// task on their work day; a competition can add a daily practice task
+/// until the big day.
+class SchoolItem {
+  SchoolItem({
+    required this.id,
+    required this.kidId,
+    required this.kind,
+    required this.title,
+    this.subject = '',
+    required this.dueYmd,
+    this.fromYmd,
+    this.toYmd,
+    this.startMin = 15 * 60 + 30,
+    this.endMin = 18 * 60 + 30,
+    this.source = 'manual',
+    this.link,
+    this.practiceTarget = 0,
+    this.practiceDone = 0,
+  });
+
+  /// Starts with "s_" so it never clashes with a routine task id.
+  final String id;
+  String kidId;
+  SchoolKind kind;
+  String title;
+  String subject;
+
+  /// Due date, or the day of the competition: "20261028".
+  String dueYmd;
+
+  /// The task shows on school days from [fromYmd] to [toYmd] (inclusive).
+  /// Both null: a reminder only, no task.
+  String? fromYmd;
+  String? toYmd;
+  int startMin;
+  int endMin;
+
+  /// "manual" or "classroom".
+  String source;
+  String? link;
+
+  /// Competitions: practice sessions planned, and done in earlier weeks.
+  int practiceTarget;
+  int practiceDone;
+
+  bool get hasTask => fromYmd != null && toYmd != null;
+
+  String get taskTitle => switch (kind) {
+    SchoolKind.homework =>
+      subject.isEmpty ? 'Homework: $title' : 'Homework ($subject): $title',
+    SchoolKind.test =>
+      subject.isEmpty
+          ? 'Revise for test: $title'
+          : 'Revise for $subject test: $title',
+    SchoolKind.event => 'Practise for $title',
+  };
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'kidId': kidId,
+    'kind': kind.name,
+    'title': title,
+    'subject': subject,
+    'dueYmd': dueYmd,
+    'fromYmd': fromYmd,
+    'toYmd': toYmd,
+    'startMin': startMin,
+    'endMin': endMin,
+    'source': source,
+    'link': link,
+    'practiceTarget': practiceTarget,
+    'practiceDone': practiceDone,
+  };
+
+  factory SchoolItem.fromJson(Map<String, dynamic> j) => SchoolItem(
+    id: j['id'] as String,
+    kidId: j['kidId'] as String,
+    kind: _enumByName(SchoolKind.values, j['kind'], SchoolKind.homework),
+    title: j['title'] as String? ?? '',
+    subject: j['subject'] as String? ?? '',
+    dueYmd: j['dueYmd'] as String,
+    fromYmd: j['fromYmd'] as String?,
+    toYmd: j['toYmd'] as String?,
+    startMin: (j['startMin'] as num?)?.toInt() ?? 15 * 60 + 30,
+    endMin: (j['endMin'] as num?)?.toInt() ?? 18 * 60 + 30,
+    source: j['source'] as String? ?? 'manual',
+    link: j['link'] as String?,
+    practiceTarget: (j['practiceTarget'] as num?)?.toInt() ?? 0,
+    practiceDone: (j['practiceDone'] as num?)?.toInt() ?? 0,
+  );
+}
+
 class WeekSummary {
   WeekSummary(this.weekId, this.starsByKid);
   final String weekId;
@@ -299,8 +401,10 @@ class FamilyData {
     this.adhanEnabled = true,
     this.tzOffsetMin = 0,
     Map<String, List<int>>? prayerWindows,
+    List<SchoolItem>? schoolItems,
   }) : history = history ?? [],
-       prayerWindows = prayerWindows ?? {};
+       prayerWindows = prayerWindows ?? {},
+       schoolItems = schoolItems ?? [];
 
   /// Firestore document id of the family.
   final String id;
@@ -320,6 +424,9 @@ class FamilyData {
   /// check salah ticks without doing astronomy.
   Map<String, List<int>> prayerWindows;
 
+  /// Homework, tests and competitions (Stage 3).
+  List<SchoolItem> schoolItems;
+
   /// Fields stored on families/{id}. Kids and weeks live in sub-collections.
   Map<String, dynamic> toDoc() => {
     'parents': parents,
@@ -330,6 +437,7 @@ class FamilyData {
     'adhanEnabled': adhanEnabled,
     'tzOffsetMin': tzOffsetMin,
     'prayerWindows': prayerWindows,
+    'schoolItems': {for (final i in schoolItems) i.id: i.toJson()},
   };
 
   factory FamilyData.fromDoc(
@@ -358,5 +466,8 @@ class FamilyData {
         (v as List).map((e) => (e as num).toInt()).toList(),
       ),
     ),
+    schoolItems: ((j['schoolItems'] as Map?) ?? {}).values
+        .map((e) => SchoolItem.fromJson(asMap(e)))
+        .toList(),
   );
 }

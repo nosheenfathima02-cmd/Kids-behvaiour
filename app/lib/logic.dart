@@ -201,3 +201,66 @@ String formatMinute(int m) {
 }
 
 const weekdayNames = ['', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+// ---------------- school (Stage 3) ----------------
+
+/// "20261028" -> 28 Oct 2026 (local midnight).
+DateTime dateFromYmd(String ymd) {
+  final n = int.parse(ymd);
+  return DateTime(n ~/ 10000, (n ~/ 100) % 100, n % 100);
+}
+
+DateTime _day(DateTime t) => DateTime(t.year, t.month, t.day);
+
+/// Whole days from today to [ymd] (0 = today, 1 = tomorrow, negative = past).
+int daysUntil(String ymd, DateTime now) =>
+    dateFromYmd(ymd).difference(_day(now)).inHours ~/ 24;
+
+/// When to do homework or revise for a test: the school day before it is
+/// due, but never before today.
+DateTime defaultWorkDay(DateTime due, DateTime today) {
+  final dueDay = _day(due);
+  final todayDay = _day(today);
+  var d = dueDay.subtract(const Duration(days: 1));
+  while (d.weekday > 5) {
+    d = d.subtract(const Duration(days: 1));
+  }
+  if (d.isBefore(todayDay)) d = todayDay.isAfter(dueDay) ? dueDay : todayDay;
+  return d;
+}
+
+/// The school items that need a task this week, as routine-style tasks.
+/// Their ids start with "s_", which the security rules recognise.
+List<RoutineTask> schoolTasks(List<SchoolItem> items, String weekId) {
+  if (weekId.length != 8) return [];
+  final monday = dateFromYmd(weekId);
+  final out = <RoutineTask>[];
+  for (final item in items.where((i) => i.hasTask)) {
+    final days = <int>[
+      for (var d = 1; d <= 5; d++)
+        if (() {
+          final ymd = ymdKey(monday.add(Duration(days: d - 1)));
+          return ymd.compareTo(item.fromYmd!) >= 0 &&
+              ymd.compareTo(item.toYmd!) <= 0;
+        }())
+          d,
+    ];
+    if (days.isEmpty) continue;
+    out.add(
+      RoutineTask(
+        id: item.id,
+        title: item.taskTitle,
+        category: TaskCategory.study,
+        startMin: item.startMin,
+        endMin: item.endMin,
+        weekdays: days,
+        kidIds: [item.kidId],
+      ),
+    );
+  }
+  return out;
+}
+
+/// Practice sessions for a competition ticked this week.
+int practiceTicksThisWeek(Kid kid, SchoolItem item) =>
+    kid.checks.keys.where((k) => k.endsWith(':${item.id}')).length;
