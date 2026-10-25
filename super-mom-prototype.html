@@ -1,0 +1,493 @@
+<title>Super Mom</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&family=Amiri:wght@400;700&display=swap">
+<style>
+/* Layout: sticky app bar with view tabs + demo clock; Mom = dashboard grid, Kid = phone-width card stack, Plan = readable doc column */
+:root{
+  --bg:#eef4f2; --surface:#ffffff; --sunk:#e3ece9; --ink:#132e29; --muted:#566f69; --line:#d3e0dc;
+  --brand:#0d6b5b; --brand-ink:#ffffff; --gold:#c98d0a; --gold-soft:#fbefd0;
+  --ok:#23824f; --warn:#b86e00; --bad:#bd3b2f;
+  --display:"Fredoka","Trebuchet MS",system-ui,sans-serif;
+  --body:"Nunito",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --arabic:"Amiri","Traditional Arabic","Times New Roman",serif;
+  --r:14px;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0c1614; --surface:#14211f; --sunk:#1b2b28; --ink:#e3efec; --muted:#97aca7; --line:#27403b;
+  --brand:#3cbca4; --brand-ink:#06201b; --gold:#f2c14a; --gold-soft:#3a3016;
+  --ok:#4cc483; --warn:#f0a43a; --bad:#f07466; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0c1614; --surface:#14211f; --sunk:#1b2b28; --ink:#e3efec; --muted:#97aca7; --line:#27403b;
+  --brand:#3cbca4; --brand-ink:#06201b; --gold:#f2c14a; --gold-soft:#3a3016;
+  --ok:#4cc483; --warn:#f0a43a; --bad:#f07466; color-scheme:dark}
+
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.5}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--surface)}
+h1,h2,h3{font-family:var(--display);font-weight:600;line-height:1.2;text-wrap:balance;margin:0}
+h2{font-size:1.25rem} h3{font-size:1.05rem}
+button,input,select{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:3px solid var(--brand);outline-offset:2px}
+.wrap{max-width:1180px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+
+/* app bar */
+.bar{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--surface);border-bottom:1px solid var(--line)}
+.bar .wrap{display:flex;flex-wrap:wrap;align-items:center;gap:10px 18px;padding-block:10px}
+.logo{display:flex;align-items:center;gap:10px;font-family:var(--display);font-size:1.35rem;font-weight:700;color:var(--brand)}
+.logo svg{width:32px;height:32px}
+.tabs{display:flex;gap:4px;background:var(--sunk);padding:4px;border-radius:999px}
+.tabs button{border:0;background:transparent;padding:6px 14px;border-radius:999px;font-weight:700;color:var(--muted)}
+.tabs button[aria-pressed="true"]{background:var(--surface);color:var(--ink);box-shadow:0 1px 3px rgb(0 0 0 / .12)}
+.clock{margin-left:auto;display:flex;flex-wrap:wrap;align-items:center;gap:8px;font-size:.85rem;color:var(--muted)}
+.clock select{border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:4px 6px}
+.clock input[type=range]{width:150px;accent-color:var(--brand)}
+.clock b{font-variant-numeric:tabular-nums;color:var(--ink);font-size:1rem;min-width:4.6em}
+.demo-tag{font-size:.7rem;letter-spacing:.08em;text-transform:uppercase;font-weight:800;color:var(--warn)}
+
+main{padding-block:22px 60px}
+.section-head{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:12px}
+.muted{color:var(--muted)}
+.small{font-size:.85rem}
+.label{font-size:.72rem;letter-spacing:.08em;text-transform:uppercase;font-weight:800;color:var(--muted)}
+
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:16px}
+.grid{display:grid;gap:16px}
+.cols-2{grid-template-columns:repeat(auto-fit,minmax(min(100%,340px),1fr))}
+.kids-row{grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr))}
+.stack{display:flex;flex-direction:column;gap:12px}
+.row{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+
+.btn{border:1px solid var(--line);background:var(--surface);padding:6px 12px;border-radius:999px;font-weight:700;font-size:.85rem}
+.btn:hover{background:var(--sunk)}
+.btn.primary{background:var(--brand);color:var(--brand-ink);border-color:var(--brand)}
+.btn.ok{color:var(--ok);border-color:color-mix(in oklab,var(--ok) 45%,var(--line))}
+.btn.bad{color:var(--bad);border-color:color-mix(in oklab,var(--bad) 45%,var(--line))}
+.btn[disabled]{opacity:.45;cursor:not-allowed}
+
+.pill{display:inline-flex;align-items:center;gap:4px;font-size:.72rem;font-weight:800;padding:2px 8px;border-radius:999px;white-space:nowrap}
+.pill.open{background:color-mix(in oklab,var(--brand) 16%,transparent);color:var(--brand)}
+.pill.pending{background:color-mix(in oklab,var(--warn) 18%,transparent);color:var(--warn)}
+.pill.done{background:color-mix(in oklab,var(--ok) 18%,transparent);color:var(--ok)}
+.pill.missed{background:color-mix(in oklab,var(--bad) 15%,transparent);color:var(--bad)}
+.pill.upcoming{background:var(--sunk);color:var(--muted)}
+.pill.src{background:color-mix(in oklab,#2f7fd6 18%,transparent);color:color-mix(in oklab,#2f7fd6 80%,var(--ink))}
+.pill.exam{background:var(--gold-soft);color:var(--gold)}
+
+/* stars */
+.stars{display:flex;gap:3px;flex-wrap:wrap}
+.stars svg{width:20px;height:20px}
+.stars .on{fill:var(--gold)} .stars .off{fill:var(--sunk);stroke:var(--line)}
+.stars .lost{fill:color-mix(in oklab,var(--bad) 35%,var(--sunk))}
+.score{font-family:var(--display);font-size:1.6rem;font-weight:700;font-variant-numeric:tabular-nums}
+.score small{font-size:.9rem;color:var(--muted)}
+
+.avatar{width:42px;height:42px;border-radius:50%;display:grid;place-items:center;font-family:var(--display);font-weight:700;font-size:1.2rem;color:#fff;background:var(--kid);flex:none}
+.kidcard{border-top:5px solid var(--kid)}
+.kidcard.sel{box-shadow:0 0 0 2px var(--kid)}
+
+/* task rows */
+.tasks{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+.task{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:10px;padding:10px 0;border-top:1px solid var(--line)}
+.task:first-child{border-top:0}
+.task .t{min-width:0}
+.task .t b{display:block;font-weight:700}
+.task .t span{font-size:.8rem;color:var(--muted);font-variant-numeric:tabular-nums}
+.cat{width:32px;height:32px;border-radius:9px;display:grid;place-items:center;background:var(--sunk);font-size:.95rem}
+.cat svg{width:18px;height:18px;stroke:var(--muted);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.task .acts{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+
+.pending-list .task{grid-template-columns:auto 1fr auto}
+
+table{border-collapse:collapse;width:100%;font-size:.88rem}
+th,td{text-align:left;padding:7px 8px;border-bottom:1px solid var(--line);vertical-align:middle}
+th{font-size:.72rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+td.num{font-variant-numeric:tabular-nums;white-space:nowrap}
+.scroll{overflow-x:auto}
+.form{display:flex;flex-wrap:wrap;gap:8px;align-items:end;margin-top:10px}
+.form label{display:flex;flex-direction:column;font-size:.75rem;font-weight:700;color:var(--muted);gap:2px}
+.form input,.form select{border:1px solid var(--line);background:var(--bg);border-radius:8px;padding:6px 8px;min-width:0}
+.form input[type=text]{width:min(240px,100%)}
+
+.swatches{display:flex;gap:8px;flex-wrap:wrap}
+.swatch{width:34px;height:34px;border-radius:50%;border:3px solid transparent;background:var(--c)}
+.swatch[aria-pressed="true"]{border-color:var(--ink)}
+.toggle{display:flex;align-items:center;gap:10px;font-weight:700}
+.toggle input{width:42px;height:24px;accent-color:var(--gold)}
+
+.bar-track{height:8px;border-radius:99px;background:var(--sunk);overflow:hidden}
+.bar-fill{height:100%;background:var(--brand);border-radius:99px}
+
+/* kid phone */
+.phone{max-width:430px;margin:0 auto;background:color-mix(in oklab,var(--kid) 9%,var(--bg));border:1px solid var(--line);border-radius:28px;padding:18px 14px 22px;display:flex;flex-direction:column;gap:12px}
+.phone .panel{border-color:color-mix(in oklab,var(--kid) 25%,var(--line))}
+.hello{display:flex;align-items:center;gap:12px}
+.hello h2{font-size:1.5rem}
+.quote{background:var(--kid);color:#fff;border-radius:var(--r);padding:14px 16px}
+.quote p{margin:4px 0 0;font-size:1.05rem;font-weight:700}
+.quote .label{color:rgb(255 255 255 / .85)}
+.prayer-strip{display:grid;grid-template-columns:repeat(5,1fr);gap:4px;text-align:center}
+.prayer-strip div{padding:6px 2px;border-radius:10px;background:var(--sunk);font-size:.75rem}
+.prayer-strip b{display:block;font-family:var(--display);font-size:.9rem}
+.prayer-strip .next{background:var(--kid);color:#fff}
+.check{width:34px;height:34px;border-radius:10px;border:2.5px solid var(--kid);background:var(--surface);display:grid;place-items:center;flex:none}
+.check svg{width:20px;height:20px;stroke:#fff;fill:none;stroke-width:3.2;stroke-linecap:round;stroke-linejoin:round}
+.check.done{background:var(--ok);border-color:var(--ok)}
+.check[disabled]{border-color:var(--line);background:var(--sunk);cursor:not-allowed}
+.check .lock{stroke:var(--muted);stroke-width:2}
+.ayah{font-family:var(--arabic);font-size:1.45rem;line-height:2;direction:rtl;text-align:right}
+.reward{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 12px;border-radius:12px;background:var(--sunk)}
+.reward.can{background:var(--gold-soft)}
+.reward.wished{outline:2px solid var(--gold)}
+.reward .need{font-size:.78rem;color:var(--muted);white-space:nowrap}
+.exam-banner{background:var(--gold-soft);color:var(--ink);border-radius:var(--r);padding:12px 14px;font-weight:700}
+
+/* plan doc */
+.doc{max-width:780px;margin:0 auto}
+.doc h2{margin-top:30px;margin-bottom:8px;font-size:1.4rem}
+.doc h2:first-child{margin-top:0}
+.doc p,.doc li{max-width:68ch}
+.doc ul{padding-left:20px}
+.doc li{margin-block:4px}
+.phase{display:grid;grid-template-columns:auto 1fr;gap:4px 14px;padding:12px 0;border-top:1px solid var(--line)}
+.phase .n{font-family:var(--display);font-weight:700;color:var(--brand);font-size:1.1rem}
+.callout{border-left:4px solid var(--gold);background:var(--gold-soft);padding:10px 14px;border-radius:0 10px 10px 0}
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:999px;font-weight:700;z-index:20;max-width:calc(100% - 32px)}
+@media (prefers-reduced-motion:no-preference){.check,.btn,.reward{transition:background .15s,transform .1s}.check:active:not([disabled]){transform:scale(.92)}}
+@media (max-width:640px){.clock{margin-left:0;width:100%}.clock input[type=range]{flex:1}}
+</style>
+
+<header class="bar">
+  <div class="wrap">
+    <div class="logo">
+      <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M16 2l3.6 7.4 8.1 1.2-5.9 5.7 1.4 8.1L16 20.6l-7.2 3.8 1.4-8.1-5.9-5.7 8.1-1.2z" fill="var(--gold)"/><path d="M22 4a7 7 0 1 0 6 10.5A8.5 8.5 0 0 1 22 4z" fill="var(--brand)"/></svg>
+      Super Mom
+    </div>
+    <nav class="tabs" aria-label="Views">
+      <button data-view="mom">Mom (admin)</button>
+      <button data-view="kid">Kid's device</button>
+      <button data-view="plan">Build plan</button>
+    </nav>
+    <div class="clock" id="clock">
+      <span class="demo-tag">Demo clock</span>
+      <select id="daySel" aria-label="Day"></select>
+      <input id="timeSel" type="range" min="270" max="1290" step="5" aria-label="Time of day">
+      <b id="timeOut"></b>
+    </div>
+  </div>
+</header>
+<main class="wrap" id="app"></main>
+<div class="toast" id="toast" hidden></div>
+
+<script>
+const DAYS=["","Mon","Tue","Wed","Thu","Fri"];
+const THEMES={rose:{name:"Rose",c:"#c9467e"},ocean:{name:"Ocean",c:"#2f78c9"},garden:{name:"Garden",c:"#2b8f55"},sunset:{name:"Sunset",c:"#d9602a"},galaxy:{name:"Galaxy",c:"#6f52d6"}};
+// Sample prayer times. The real app computes these on the phone from the city mom picks.
+const PRAYERS=[["Fajr","05:12"],["Dhuhr","12:08"],["Asr","15:20"],["Maghrib","17:52"],["Isha","19:10"]];
+const QUOTES=[
+ ["Indeed, with hardship comes ease.","Qur'an 94:6"],
+ ["The best of you are those who learn the Qur'an and teach it.","Sahih al-Bukhari"],
+ ["Your smile for your brother is charity.","Jami' at-Tirmidhi"],
+ ["The strong one is the one who controls himself when angry.","Sahih al-Bukhari"],
+ ["Allah does not burden a soul beyond what it can bear.","Qur'an 2:286"]];
+const ICONS={
+ salah:'<path d="M4 20h16M6 20V11a6 6 0 0 1 12 0v9M12 3v2"/>',
+ morning:'<circle cx="12" cy="13" r="4"/><path d="M12 3v3M4.9 6.9l2 2M19.1 6.9l-2 2M3 17h18"/>',
+ study:'<path d="M3 6l9-3 9 3-9 3zM7 8v5c0 1.5 2.5 3 5 3s5-1.5 5-3V8"/>',
+ quran:'<path d="M12 6c-2-1.5-5-2-8-1.5v13c3-.5 6 0 8 1.5 2-1.5 5-2 8-1.5v-13c-3-.5-6 0-8 1.5zM12 6v13"/>',
+ chores:'<path d="M3 21l7-7M14 3l7 7-6 6-7-7z"/>',
+ health:'<path d="M12 8c-2-4-8-3-8 2 0 5 8 10 8 10s8-5 8-10c0-5-6-6-8-2z"/>',
+ screen:'<rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/>',
+ sleep:'<path d="M20 14A8 8 0 0 1 10 4a8 8 0 1 0 10 10z"/>',
+ fast:'<path d="M18 4a8 8 0 1 0 2 9 6 6 0 0 1-2-9z"/>'};
+const EXAM_CATS=["salah","study","quran","sleep","morning"];
+const toMin=s=>{const[h,m]=s.split(":").map(Number);return h*60+m};
+const fmt=m=>{const h=Math.floor(m/60),mm=String(m%60).padStart(2,"0");const ap=h>=12?"pm":"am";return `${((h+11)%12)+1}:${mm} ${ap}`};
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+
+function seed(){
+ const T=(id,title,cat,start,end,extra={})=>({id,title,cat,start,end,...extra});
+ const tasks=[
+  T("wake","Wake up by 6:00 am","morning","05:00","06:15"),
+  T("fajr","Pray Fajr","salah","05:12","06:30"),
+  T("bag","Pack school bag & uniform","chores","06:00","07:15"),
+  T("bfast","Healthy breakfast","health","06:15","07:30"),
+  T("dhuhr","Pray Dhuhr (at school)","salah","12:08","15:00"),
+  T("asr","Pray Asr","salah","15:20","17:30"),
+  T("hw","Homework","study","15:30","18:30"),
+  T("quran","Qur'an: memorise 1 ayah","quran","16:00","19:00"),
+  T("room","Tidy room & toys","chores","17:00","19:00"),
+  T("maghrib","Pray Maghrib","salah","17:52","18:50"),
+  T("revise","Revise today's lessons (20 min)","study","18:00","19:30"),
+  T("veg","Fruit or veggies with dinner","health","18:30","20:00"),
+  T("isha","Pray Isha","salah","19:10","21:00"),
+  T("screen","Screen time 1 hour or less","screen","19:30","20:30"),
+  T("bed","In bed by 8:30 pm","sleep","20:00","20:45"),
+  T("fast","Sunnah fast (optional, +1 bonus star)","fast","05:00","17:52",{days:[1,4],bonus:true,kids:["aisha"]}),
+  T("cr1","Math: worksheet p.42","study","15:30","18:30",{days:[3],source:"Google Classroom"}),
+  T("cr2","Science: plant quiz revision","study","15:30","18:30",{days:[4],source:"Google Classroom"})];
+ const approveAll=(kid,day,except=[])=>tasks.forEach(t=>{if((!t.days||t.days.includes(day))&&(!t.kids||t.kids.includes(kid))&&!except.includes(t.id))chk[kid][day+":"+t.id]="kid"});
+ const chk={aisha:{},yusuf:{}};
+ approveAll("aisha",1,["screen"]); approveAll("aisha",2,["veg","revise"]);
+ ["wake","fajr","bag","bfast","dhuhr"].forEach(id=>chk.aisha["3:"+id]="kid"); chk.aisha["3:asr"]="kid";
+ approveAll("yusuf",1,["fajr","room","revise"]); approveAll("yusuf",2,["screen"]);
+ ["wake","bag","bfast","dhuhr"].forEach(id=>chk.yusuf["3:"+id]="kid"); chk.yusuf["3:asr"]="kid"; chk.yusuf["3:hw"]="kid"; chk.yusuf["3:bag"]="mom";
+ return {view:"mom",momKid:"aisha",kidDevice:"aisha",demo:{day:3,min:16*60+30},tasks,
+  kids:[
+   {id:"aisha",name:"Aisha",age:10,theme:"rose",exam:false,checks:chk.aisha,timeouts:[{day:2,min:18*60+5,reason:"Shouted at brother"}],wish:null,
+    surah:{name:"Al-'Asr (103)",done:2,total:3},
+    rewards:[{name:"Picnic at the lake park",stars:10},{name:"Trampoline park",stars:10},{name:"Pick Friday dinner",stars:8},{name:"Extra 30 min weekend play",stars:6}]},
+   {id:"yusuf",name:"Yusuf",age:7,theme:"galaxy",exam:false,checks:chk.yusuf,timeouts:[{day:1,min:17*60+40,reason:"Screen time without asking"},{day:3,min:7*60,reason:"Refused to get ready"}],wish:null,
+    surah:{name:"Al-Ikhlas (112)",done:3,total:4},
+    rewards:[{name:"Science museum",stars:10},{name:"Ice-cream trip",stars:8},{name:"New colouring book",stars:6}]}],
+  events:[{kid:"aisha",title:"School Qur'an recitation competition",date:"Thu 29 Oct",unit:"practice sessions",done:4,target:10},
+          {kid:"yusuf",title:"Spelling bee (class 2)",date:"Fri 30 Oct",unit:"word lists",done:2,target:5}]};
+}
+let S;
+try{S=JSON.parse(localStorage.getItem("supermom-demo-v2"))}catch(e){}
+if(!S||!S.kids)S=seed();
+const save=()=>{try{localStorage.setItem("supermom-demo-v2",JSON.stringify(S))}catch(e){}};
+const kidById=id=>S.kids.find(k=>k.id===id);
+const isDone=v=>v==="kid"||v==="mom";
+
+function tasksFor(kid,day){return S.tasks.filter(t=>(!t.days||t.days.includes(day))&&(!t.kids||t.kids.includes(kid.id))&&(!kid.exam||EXAM_CATS.includes(t.cat)||t.bonus)).sort((a,b)=>toMin(a.start)-toMin(b.start))}
+function status(kid,t,day){
+ const s=kid.checks[day+":"+t.id];
+ if(isDone(s))return "done";
+ const D=S.demo;
+ if(day<D.day)return "missed";
+ if(day>D.day)return "upcoming";
+ if(D.min<toMin(t.start))return "upcoming";
+ if(D.min>toMin(t.end))return "missed";
+ return "open";
+}
+function dayStars(kid,day){
+ if(day>S.demo.day)return 0;
+ const list=tasksFor(kid,day).filter(t=>!t.bonus);
+ if(!list.length)return 0;
+ const ok=list.filter(t=>isDone(kid.checks[day+":"+t.id])).length/list.length;
+ return ok>=.9?2:ok>=.6?1:0;
+}
+function week(kid){
+ let earned=0,bonus=0;
+ for(let d=1;d<=5;d++){earned+=dayStars(kid,d);tasksFor(kid,d).filter(t=>t.bonus).forEach(t=>{if(isDone(kid.checks[d+":"+t.id]))bonus++})}
+ const lost=kid.timeouts.length;
+ return {earned,bonus,lost,total:Math.max(0,Math.min(10,earned+bonus-lost))};
+}
+const STAR='<path d="M10 1.5l2.6 5.4 5.9.9-4.3 4.1 1 5.9L10 15l-5.2 2.8 1-5.9L1.5 7.8l5.9-.9z"/>';
+function starRow(kid){
+ const w=week(kid);let h="";
+ for(let i=0;i<10;i++){const cls=i<w.total?"on":(i<w.total+w.lost&&i<w.earned+w.bonus?"lost":"off");h+=`<svg viewBox="0 0 20 20" class="${cls}" aria-hidden="true">${STAR}</svg>`}
+ return `<div class="stars" role="img" aria-label="${w.total} of 10 stars">${h}</div>`;
+}
+const pill=s=>`<span class="pill ${s}">${{open:"Open now",done:"Done ✓",missed:"Time closed",upcoming:"Later"}[s]}</span>`;
+const catIcon=c=>`<span class="cat" aria-hidden="true"><svg viewBox="0 0 24 24">${ICONS[c]||ICONS.chores}</svg></span>`;
+function nextPrayer(){const m=S.demo.min;for(const[n,t]of PRAYERS)if(toMin(t)>m)return{n,t,in:toMin(t)-m};return{n:"Fajr",t:PRAYERS[0][1],in:null}}
+const kidStyle=k=>`--kid:${THEMES[k.theme].c}`;
+
+/* ---------- MOM VIEW ---------- */
+function momView(){
+ const D=S.demo;
+ const pend=[];S.kids.forEach(k=>tasksFor(k,D.day).forEach(t=>{if(k.checks[D.day+":"+t.id]==="kid")pend.push({k,t,d:D.day})}));
+ const k=kidById(S.momKid);
+ const kidCards=S.kids.map(kid=>{const w=week(kid);const p=pend.filter(x=>x.k===kid).length;
+  return `<button class="panel kidcard stack ${kid.id===S.momKid?"sel":""}" style="${kidStyle(kid)};text-align:left" data-act="momKid" data-kid="${kid.id}">
+   <div class="row"><span class="avatar">${esc(kid.name[0])}</span><div><h3>${esc(kid.name)}</h3><span class="small muted">Age ${kid.age} · ${THEMES[kid.theme].name} theme</span></div>
+   ${kid.exam?'<span class="pill exam" style="margin-left:auto">Exam week</span>':""}</div>
+   <div class="row" style="justify-content:space-between"><span class="score">${w.total}<small> / 10 stars</small></span>${starRow(kid)}</div>
+   <div class="row small muted"><span>${p} task${p===1?"":"s"} ticked today</span>·<span>${w.lost} time-out${w.lost===1?"":"s"} (−${w.lost})</span>${w.bonus?`·<span>+${w.bonus} bonus</span>`:""}</div>
+  </button>`}).join("");
+
+ const pendHtml=pend.length?`<ul class="tasks pending-list">${pend.map(({k:kk,t,d})=>`<li class="task" style="${kidStyle(kk)}">
+   <span class="avatar" style="width:32px;height:32px;font-size:.95rem">${esc(kk.name[0])}</span>
+   <div class="t"><b>${esc(t.title)}</b><span>${esc(kk.name)} · ${DAYS[d]} · ${fmt(toMin(t.start))}–${fmt(toMin(t.end))}</span></div>
+   <div class="acts"><span class="pill done">Done ✓</span><button class="btn bad" data-act="undo" data-kid="${kk.id}" data-key="${d}:${t.id}" title="Use this if the task wasn't really done">Undo tick</button></div></li>`).join("")}</ul>`
+  :`<p class="muted">No ticks yet today. When a child marks a task done, it shows up here straight away.</p>`;
+
+ const today=tasksFor(k,D.day).map(t=>{const s=status(k,t,D.day);const key=D.day+":"+t.id;
+  return `<li class="task">${catIcon(t.cat)}<div class="t"><b>${esc(t.title)}</b><span>${fmt(toMin(t.start))} – ${fmt(toMin(t.end))}${t.source?` · <span class="pill src">${esc(t.source)}</span>`:""}</span></div>
+  <div class="acts">${pill(s)}${s==="done"?`<span class="small muted">${k.checks[key]==="mom"?"by Mom":"by "+esc(k.name)}</span>`:""}${s!=="done"?`<button class="btn" data-act="approve" data-kid="${k.id}" data-key="${key}" title="Mark done yourself">Mark done</button>`:`<button class="btn" data-act="undo" data-kid="${k.id}" data-key="${key}">Undo</button>`}</div></li>`}).join("");
+
+ const daysTable=`<div class="scroll"><table><thead><tr><th>Day</th><th>Tasks done</th><th>Stars</th></tr></thead><tbody>${[1,2,3,4,5].map(d=>{
+   const list=tasksFor(k,d).filter(t=>!t.bonus);const ok=list.filter(t=>isDone(k.checks[d+":"+t.id])).length;
+   return `<tr><td>${DAYS[d]}${d===D.day?" (today)":""}</td><td class="num">${d>D.day?"–":`${ok} / ${list.length}`}</td><td class="num">${d>D.day?"–":"★".repeat(dayStars(k,d))||"0"}</td></tr>`}).join("")}</tbody></table></div>
+   <p class="small muted">A day with 90%+ of tasks done earns 2 stars, 60%+ earns 1. Five school days make 10 stars. Each time-out takes 1 star away.</p>`;
+
+ const timeouts=k.timeouts.map((t,i)=>`<li class="task"><span class="cat" aria-hidden="true" style="color:var(--bad);font-weight:800">−1</span><div class="t"><b>${esc(t.reason)}</b><span>${DAYS[t.day]} ${fmt(t.min)}</span></div><div class="acts"><button class="btn" data-act="untime" data-kid="${k.id}" data-i="${i}">Remove</button></div></li>`).join("");
+
+ const rewards=k.rewards.map((r,i)=>`<li class="task"><span class="cat" aria-hidden="true" style="color:var(--gold);font-weight:800">${r.stars}★</span><div class="t"><b>${esc(r.name)}</b><span>${k.wish===i?"⭐ "+esc(k.name)+" picked this one":"Unlocks at "+r.stars+" stars"}</span></div><div class="acts"><button class="btn bad" data-act="delReward" data-kid="${k.id}" data-i="${i}">Remove</button></div></li>`).join("");
+
+ const events=S.events.map((e,i)=>{const kk=kidById(e.kid);return `<div class="stack" style="gap:6px"><div class="row" style="justify-content:space-between"><b>${esc(e.title)}</b><span class="pill upcoming">${esc(e.date)}</span></div>
+   <span class="small muted">${esc(kk.name)} · ${e.done} of ${e.target} ${esc(e.unit)} done</span>
+   <div class="row"><div class="bar-track" style="flex:1"><div class="bar-fill" style="width:${Math.round(e.done/e.target*100)}%"></div></div><button class="btn" data-act="evt" data-i="${i}" ${e.done>=e.target?"disabled":""}>+1 session</button></div></div>`}).join("");
+
+ const routine=S.tasks.map((t,i)=>`<tr><td>${esc(t.title)}${t.source?` <span class="pill src">Classroom</span>`:""}</td><td>${t.cat}</td><td class="num">${t.start}–${t.end}</td><td>${t.days?t.days.map(d=>DAYS[d]).join(", "):"Mon–Fri"}${t.kids?" · "+t.kids.map(id=>kidById(id).name).join(", "):""}</td><td><button class="btn bad" data-act="delTask" data-i="${i}" aria-label="Delete ${esc(t.title)}">Delete</button></td></tr>`).join("");
+
+ return `
+ <div class="section-head"><h2>Assalamu alaikum, Mom</h2><span class="muted small">Week of Mon–Fri · resets automatically every Saturday</span></div>
+ <div class="grid kids-row" style="margin-bottom:16px">${kidCards}</div>
+ <div class="grid cols-2">
+  <section class="panel stack"><div class="section-head" style="margin:0"><h3>Ticked by the kids today</h3><span class="pill done">${pend.length}</span></div>${pendHtml}</section>
+  <section class="panel stack" style="${kidStyle(k)}">
+   <div class="section-head" style="margin:0"><h3>Time-out for ${esc(k.name)}</h3><span class="small muted">each one takes away 1 star</span></div>
+   <form class="form" id="toForm" style="margin:0"><label>Reason<select id="toReason"><option>Hitting or pushing</option><option>Rude words / shouting</option><option>Screen time without asking</option><option>Not listening</option><option>Refused to get ready</option></select></label><button class="btn bad" type="submit">Give time-out (−1★)</button></form>
+   ${timeouts?`<ul class="tasks">${timeouts}</ul>`:'<p class="muted small">No time-outs this week. MashaAllah!</p>'}
+  </section>
+  <section class="panel stack"><div class="section-head" style="margin:0"><h3>${esc(k.name)} · ${DAYS[D.day]} checklist</h3>${k.exam?'<span class="pill exam">Exam week: study tasks only</span>':""}</div>
+   <p class="small muted" style="margin:0">Kids mark tasks done on their own device while the time window is open. You see every tick here and can mark done or undo anything, any time.</p>
+   <ul class="tasks">${today}</ul></section>
+  <section class="panel stack"><h3>${esc(k.name)}'s week</h3>${daysTable}</section>
+  <section class="panel stack" style="${kidStyle(k)}"><h3>Rewards ${esc(k.name)} can choose from</h3>
+   <ul class="tasks">${rewards||'<li class="muted">No rewards yet.</li>'}</ul>
+   <form class="form" id="rwForm"><label>Place or treat<input id="rwName" type="text" placeholder="e.g. Zoo trip" required></label><label>Stars needed<select id="rwStars">${[10,9,8,7,6,5].map(n=>`<option>${n}</option>`).join("")}</select></label><button class="btn primary" type="submit">Add reward</button></form></section>
+  <section class="panel stack" style="${kidStyle(k)}"><h3>Settings for ${esc(k.name)}</h3>
+   <div class="stack" style="gap:6px"><span class="label">Theme on ${esc(k.name)}'s device</span><div class="swatches">${Object.entries(THEMES).map(([id,t])=>`<button class="swatch" style="--c:${t.c}" aria-label="${t.name}" aria-pressed="${k.theme===id}" data-act="theme" data-kid="${k.id}" data-theme="${id}"></button>`).join("")}</div></div>
+   <label class="toggle"><input type="checkbox" id="examToggle" ${k.exam?"checked":""}> Exam / study week mode</label>
+   <p class="small muted" style="margin:0">Exam mode hides chores and screen-time goals so the day is only salah, Qur'an, study and sleep.</p>
+   <div class="stack" style="gap:6px"><span class="label">Hifz this week</span><b>Surah ${esc(k.surah.name)}: ${k.surah.done} of ${k.surah.total} ayat</b>
+   <div class="row"><div class="bar-track" style="flex:1"><div class="bar-fill" style="width:${Math.round(k.surah.done/k.surah.total*100)}%"></div></div><button class="btn" data-act="ayah" data-kid="${k.id}" ${k.surah.done>=k.surah.total?"disabled":""}>+1 ayah</button></div></div></section>
+  <section class="panel stack"><div class="section-head" style="margin:0"><h3>School: competitions & reminders</h3><span class="pill src">Google Classroom (sample)</span></div>${events}
+   <p class="small muted" style="margin:0">Homework from Google Classroom appears as a study task on its due day (see Wednesday and Thursday).</p></section>
+ </div>
+ <section class="panel stack" style="margin-top:16px"><div class="section-head" style="margin:0"><h3>Weekday routine (all kids)</h3><button class="btn" data-act="resetWeek">Start a new week now</button></div>
+  <div class="scroll"><table><thead><tr><th>Task</th><th>Type</th><th>Window</th><th>Days / who</th><th></th></tr></thead><tbody>${routine}</tbody></table></div>
+  <form class="form" id="taskForm"><label>New task<input id="tTitle" type="text" placeholder="e.g. Read 10 pages" required></label>
+   <label>Type<select id="tCat">${Object.keys(ICONS).map(c=>`<option>${c}</option>`).join("")}</select></label>
+   <label>Opens<input id="tStart" type="time" value="16:00" required></label><label>Closes<input id="tEnd" type="time" value="18:00" required></label>
+   <button class="btn primary" type="submit">Add task</button></form></section>`;
+}
+
+/* ---------- KID VIEW ---------- */
+function kidView(){
+ const k=kidById(S.kidDevice),D=S.demo,w=week(k),np=nextPrayer();
+ const q=QUOTES[(D.day-1)%QUOTES.length];
+ const list=tasksFor(k,D.day).map(t=>{const s=status(k,t,D.day);const open=D.min>=toMin(t.start)&&D.min<=toMin(t.end);const can=s==="open"||(s==="done"&&open&&k.checks[D.day+":"+t.id]==="kid");
+  const inner=s==="done"?'<svg viewBox="0 0 24 24"><path d="M5 12l5 5 9-10"/></svg>':(!can?'<svg viewBox="0 0 24 24"><rect class="lock" x="6" y="11" width="12" height="9" rx="2"/><path class="lock" d="M9 11V8a3 3 0 0 1 6 0v3"/></svg>':"");
+  return `<li class="task"><button class="check ${s}" ${can?"":"disabled"} data-act="tick" data-id="${t.id}" aria-label="${esc(t.title)}: ${s}">${inner}</button>
+   <div class="t"><b>${esc(t.title)}</b><span>${fmt(toMin(t.start))} – ${fmt(toMin(t.end))}</span></div>${pill(s)}</li>`}).join("");
+ const rewards=k.rewards.map((r,i)=>{const can=w.total>=r.stars;return `<button class="reward ${can?"can":""} ${k.wish===i?"wished":""}" ${can?"":"disabled"} data-act="wish" data-i="${i}" style="border:0;width:100%;text-align:left">
+   <b>${esc(r.name)}</b><span class="need">${k.wish===i?"⭐ My pick!":can?"Tap to choose":`${r.stars-w.total} more ★`}</span></button>`}).join("");
+ return `<div class="phone" style="${kidStyle(k)}">
+  <div class="row" style="justify-content:space-between"><span class="label">Device: ${esc(k.name)}'s tablet</span>
+   <span class="row" style="gap:4px">${S.kids.map(x=>`<button class="btn" style="padding:2px 10px" aria-pressed="${x.id===k.id}" data-act="kidDevice" data-kid="${x.id}">${esc(x.name)}</button>`).join("")}</span></div>
+  <div class="hello"><span class="avatar">${esc(k.name[0])}</span><div><h2>Salam, ${esc(k.name)}!</h2><span class="muted small">${DAYS[D.day]}day · ${fmt(D.min)}</span></div></div>
+  <div class="quote"><span class="label">Today's reminder</span><p>“${q[0]}”</p><span class="small">${q[1]}</span></div>
+  ${k.exam?'<div class="exam-banner">Exam week! Only salah, Qur\'an and study today. You can do it, in sha Allah.</div>':""}
+  <div class="panel stack" style="gap:8px"><div class="row" style="justify-content:space-between"><span class="score">${w.total}<small> / 10 stars</small></span>${starRow(k)}</div>
+   ${w.lost?`<span class="small muted">${w.lost} star${w.lost>1?"s":""} lost to time-out this week</span>`:""}</div>
+  <div class="panel stack" style="gap:8px"><div class="row" style="justify-content:space-between"><span class="label">Salah times</span><span class="small"><b>${np.n}</b> ${np.in!=null?`in ${Math.floor(np.in/60)?Math.floor(np.in/60)+" h ":""}${np.in%60} min`:"tomorrow"}</span></div>
+   <div class="prayer-strip">${PRAYERS.map(([n,t])=>`<div class="${n===np.n?"next":""}"><b>${n}</b>${fmt(toMin(t)).replace(" ","")}</div>`).join("")}</div>
+   <span class="small muted">The adhan plays on this device at each time (Mom can turn it on or off).</span></div>
+  <div class="panel"><div class="row" style="justify-content:space-between;margin-bottom:4px"><h3>My jobs today</h3><span class="small muted">Mom can see your ticks</span></div><ul class="tasks">${list}</ul></div>
+  <div class="panel stack" style="gap:6px"><span class="label">My Qur'an this week</span><b>Surah ${esc(k.surah.name)} · ${k.surah.done}/${k.surah.total} ayat</b>
+   ${k.id==="aisha"?'<p class="ayah" lang="ar" style="margin:0">وَالْعَصْرِ ۝ إِنَّ الْإِنسَانَ لَفِي خُسْرٍ ۝ إِلَّا الَّذِينَ آمَنُوا وَعَمِلُوا الصَّالِحَاتِ وَتَوَاصَوْا بِالْحَقِّ وَتَوَاصَوْا بِالصَّبْرِ</p>':'<p class="ayah" lang="ar" style="margin:0">قُلْ هُوَ اللَّهُ أَحَدٌ ۝ اللَّهُ الصَّمَدُ ۝ لَمْ يَلِدْ وَلَمْ يُولَدْ ۝ وَلَمْ يَكُن لَّهُ كُفُوًا أَحَدٌ</p>'}
+   <div class="bar-track"><div class="bar-fill" style="width:${Math.round(k.surah.done/k.surah.total*100)}%;background:var(--kid)"></div></div></div>
+  <div class="panel stack" style="gap:8px"><h3>Where do I want to go?</h3><span class="small muted">Collect stars by Friday to unlock a treat. Mom makes the list.</span>${rewards}</div>
+ </div>`;
+}
+
+/* ---------- PLAN VIEW ---------- */
+function planView(){return `<article class="doc">
+ <h2>What Super Mom is</h2>
+ <p>One parent app (Mom/Dad as admin) and a child app on each kid's phone or tablet, all linked to the same family. Kids tick off their weekday routine on their own device. Mom sees every tick live and can change any of them, give time-outs, and edit everything else. Stars add up Monday to Friday, the week resets on Saturday, and a full week unlocks a reward the parent chose.</p>
+ <div class="callout"><b>This page is a clickable prototype.</b> Use the demo clock at the top to change the day and time: tasks unlock and lock by their time window, exactly as the real app would. Data here lives only in this browser.</div>
+
+ <h2>Features (from your list)</h2>
+ <ul>
+  <li><b>Weekday routine:</b> wake-up, 5 daily prayers, homework, chores, healthy eating, screen time, bedtime. Each task has an "opens" and "closes" time. After it closes the child can't tick it; only Mom can.</li>
+  <li><b>Kids mark, Mom edits:</b> a child's tick counts straight away and appears on Mom's phone. If it wasn't really done, Mom taps Undo.</li>
+  <li><b>Stars and time-outs:</b> up to 2 stars per school day (10 per week). Each time-out removes 1 star, with a reason the child can see.</li>
+  <li><b>Rewards:</b> Mom keeps a list of places or treats with the stars needed. When the child has enough stars they pick one.</li>
+  <li><b>Islamic focus:</b> prayer times for your city with optional adhan sound, Qur'an memorisation tracker (surah and ayat per week), optional sunnah fasting on Monday and Thursday as a bonus star, a daily ayah or hadith reminder.</li>
+  <li><b>Several children:</b> one parent account manages any number of kids, each with their own theme, routine, rewards and device.</li>
+  <li><b>Exam / study week:</b> one switch hides chores and screen goals so the day is only salah, Qur'an, study and sleep.</li>
+  <li><b>School link:</b> Google Classroom homework and due dates become study tasks automatically; competitions get a reminder and a practice counter.</li>
+ </ul>
+
+ <h2>Recommended technology</h2>
+ <ul>
+  <li><b>App: Flutter.</b> One codebase builds both the Android app (Google Play) and the iPhone/iPad app (App Store). React Native is the main alternative if your developer prefers JavaScript.</li>
+  <li><b>Cloud: Google Firebase.</b> Firestore database syncs instantly between Mom's phone and each child's device; Cloud Functions do the weekly reset and the Google Classroom sync; Firebase Cloud Messaging sends reminders. Costs stay at or near the free tier for a family-sized app.</li>
+  <li><b>Prayer times:</b> calculated on the device with the open-source <i>adhan</i> library (Muslim World League, Umm al-Qura, ISNA and other methods, Hanafi or Shafi'i Asr). It needs only the city Mom selects, not GPS tracking. Adhan audio is bundled with the app and played by a scheduled local notification.</li>
+  <li><b>Weekly reset:</b> a scheduled function runs every Saturday at midnight, saves a one-line summary (stars per child) and clears the week. You said full backups aren't needed, so nothing else is kept.</li>
+ </ul>
+
+ <h2>Security and privacy</h2>
+ <p>No app can promise it will never be attacked, but this design keeps very little to steal and locks down what there is.</p>
+ <ul>
+  <li><b>Only the parent has an account</b> (Sign in with Google or Apple, with 2-step verification). Children never enter an email or password.</li>
+  <li><b>Child devices are paired by QR code</b> shown on Mom's phone. Mom can unlink a lost device instantly.</li>
+  <li><b>Rules are enforced on the server</b>, not just hidden in the app: a child device can only tick or untick its own tasks, inside the open time window. Editing past ticks, time-outs, rewards, the routine and settings are parent-only. A modified child app still can't give itself stars.</li>
+  <li><b>Firebase App Check</b> blocks requests that don't come from the genuine app, and all data is encrypted in transit and at rest.</li>
+  <li><b>Minimal data:</b> first name, age and the week's ticks. No contacts, photos, microphone, location tracking, ads or third-party analytics. This also keeps you within COPPA (US), GDPR-K (EU/UK) and Google Play Families / App Store Kids category rules.</li>
+  <li>Google Classroom access is read-only (coursework and due dates), granted by the parent, and can be revoked at any time.</li>
+ </ul>
+
+ <h2>Things to know before building</h2>
+ <ul>
+  <li><b>Google Classroom:</b> many schools block third-party apps on student accounts. The school's Google admin may have to allow the app, or the child signs in with a personal account the teacher invites. Plan for a "type homework in manually" fallback.</li>
+  <li><b>Publishing:</b> Google Play costs a one-time $25; Apple charges $99 per year and reviews children's apps more strictly (a privacy policy and a parental gate in front of any link or purchase are required).</li>
+  <li><b>Adhan on iPhone:</b> iOS notification sounds are limited to 30 seconds, so the full adhan plays only when the app is open; a short adhan clip works as the notification sound.</li>
+ </ul>
+
+ <h2>How the kids use it</h2>
+ <ul>
+  <li><b>Setting up a child's device (once):</b> Mom installs Super Mom on the child's phone or tablet and opens it. It shows "Ask Mom to scan". On Mom's phone: Kids → Aisha → Link a device shows a QR code. Mom scans it with the child's device, and from then on that device is Aisha's.</li>
+  <li><b>Every day:</b> the child opens the app and sees their own colour theme, today's reminder, prayer times and "My jobs today". They tap a box to mark a task done. Tasks that aren't open yet, or whose time has passed, show a lock.</li>
+  <li><b>Changing their mind:</b> while a task is still open, the child can untick it. After that only Mom can change it.</li>
+  <li><b>What children can't do:</b> no settings, no rewards list editing, no time-outs, no seeing a brother's or sister's page. There is no login or password for them.</li>
+  <li><b>One device, several kids:</b> if siblings share a tablet, the child app shows each child's picture to choose from. Mom can add a 4-digit PIN for each child if needed.</li>
+  <li><b>Mom's phone:</b> Mom signs in with Google or Apple and sees all children on one screen, gets a notification when a child ticks something or misses a prayer, and can edit anything.</li>
+ </ul>
+
+ <h2>Build stages and timeline</h2>
+ <p>Each stage ends with an app you can install and try on your own phone. Stages 1 to 3 are coding work I do in this project. Stage 4 needs your accounts (Firebase, Google Play, Apple), because stores only accept apps from the owner's account.</p>
+ <div class="phase"><span class="n">1</span><div><b>Core app, works on one phone</b> · week 1–2 · <span style="color:var(--brand)">building now</span><br><span class="muted">Mom and Kid modes, add children and themes, weekday routine with time windows and locks, kids tick done, Mom sees and edits, stars (2 per day), time-outs, rewards list, Saturday reset, prayer times for your city, daily ayah/hadith reminder, Qur'an memorisation tracker, sunnah fast bonus.</span></div></div>
+ <div class="phase"><span class="n">2</span><div><b>Cloud and multiple devices</b> · week 3–4<br><span class="muted">Firebase sign-in for Mom, QR linking of each child's device, live sync, server security rules, automatic Saturday reset in the cloud, notifications to Mom, adhan notification on kids' devices.</span></div></div>
+ <div class="phase"><span class="n">3</span><div><b>School</b> · week 5–6<br><span class="muted">Exam / study week mode, Google Classroom homework import (with manual entry as backup), competition reminders and practice counters.</span></div></div>
+ <div class="phase"><span class="n">4</span><div><b>Testing and store launch</b> · week 7–9<br><span class="muted">Privacy policy, security review, testing with a few families, Google Play first (review takes a few days), then the App Store (review can take 1–2 weeks for kids' apps).</span></div></div>
+ <p class="small muted">About 2 months to the Google Play release if feedback comes back quickly between stages. Arabic or Urdu screens add about a week.</p>
+</article>`}
+
+/* ---------- wiring ---------- */
+const app=document.getElementById("app");
+function render(){
+ document.querySelectorAll(".tabs button").forEach(b=>b.setAttribute("aria-pressed",b.dataset.view===S.view));
+ document.getElementById("clock").style.visibility=S.view==="plan"?"hidden":"visible";
+ const ds=document.getElementById("daySel");if(!ds.options.length)ds.innerHTML=[1,2,3,4,5].map(d=>`<option value="${d}">${DAYS[d]}</option>`).join("");
+ ds.value=S.demo.day;document.getElementById("timeSel").value=S.demo.min;document.getElementById("timeOut").textContent=fmt(S.demo.min);
+ app.innerHTML=S.view==="mom"?momView():S.view==="kid"?kidView():planView();
+ const ex=document.getElementById("examToggle");if(ex)ex.onchange=()=>{kidById(S.momKid).exam=ex.checked;commit(ex.checked?"Exam week mode on":"Exam week mode off")};
+}
+let tt;function toast(m){const t=document.getElementById("toast");t.textContent=m;t.hidden=false;clearTimeout(tt);tt=setTimeout(()=>t.hidden=true,2200)}
+function commit(msg){save();render();if(msg)toast(msg)}
+document.querySelector(".tabs").addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;S.view=b.dataset.view;commit()});
+document.getElementById("daySel").onchange=e=>{S.demo.day=+e.target.value;commit()};
+document.getElementById("timeSel").oninput=e=>{S.demo.min=+e.target.value;save();render()};
+app.addEventListener("click",e=>{
+ const b=e.target.closest("[data-act]");if(!b||b.disabled)return;
+ const k=b.dataset.kid?kidById(b.dataset.kid):null,a=b.dataset.act;
+ if(a==="momKid"){S.momKid=b.dataset.kid;return commit()}
+ if(a==="kidDevice"){S.kidDevice=b.dataset.kid;return commit()}
+ if(a==="approve"){k.checks[b.dataset.key]="mom";return commit("Marked done for "+k.name)}
+ if(a==="undo"){delete k.checks[b.dataset.key];return commit("Undone")}
+ if(a==="untime"){k.timeouts.splice(+b.dataset.i,1);return commit("Time-out removed, star returned")}
+ if(a==="delReward"){k.rewards.splice(+b.dataset.i,1);k.wish=null;return commit("Reward removed")}
+ if(a==="theme"){k.theme=b.dataset.theme;return commit(k.name+"'s theme: "+THEMES[k.theme].name)}
+ if(a==="ayah"){k.surah.done++;return commit("MashaAllah! +1 ayah")}
+ if(a==="evt"){S.events[+b.dataset.i].done++;return commit("Practice logged")}
+ if(a==="delTask"){S.tasks.splice(+b.dataset.i,1);return commit("Task deleted")}
+ if(a==="resetWeek"){if(b.dataset.confirm){S.kids.forEach(x=>{x.checks={};x.timeouts=[];x.wish=null});S.demo.day=1;S.demo.min=5*60+30;return commit("New week started. Everyone is back to 0 stars")}
+   b.dataset.confirm="1";b.textContent="Tap again to clear this week";b.classList.add("bad");return}
+ if(a==="tick"){const kid=kidById(S.kidDevice),key=S.demo.day+":"+b.dataset.id;if(kid.checks[key]){delete kid.checks[key];return commit("Tick removed")}kid.checks[key]="kid";return commit("Well done! Mom can see it")}
+ if(a==="wish"){const kid=kidById(S.kidDevice);kid.wish=+b.dataset.i;return commit("Mom will see your pick!")}
+});
+app.addEventListener("submit",e=>{e.preventDefault();const f=e.target,k=kidById(S.momKid);
+ if(f.id==="toForm"){k.timeouts.push({day:S.demo.day,min:S.demo.min,reason:document.getElementById("toReason").value});return commit("Time-out given: −1 star for "+k.name)}
+ if(f.id==="rwForm"){k.rewards.push({name:document.getElementById("rwName").value.trim(),stars:+document.getElementById("rwStars").value});k.rewards.sort((a,b)=>b.stars-a.stars);return commit("Reward added")}
+ if(f.id==="taskForm"){const s=document.getElementById("tStart").value,en=document.getElementById("tEnd").value;if(toMin(en)<=toMin(s))return toast("Closing time must be after opening time");
+   S.tasks.push({id:"t"+Date.now(),title:document.getElementById("tTitle").value.trim(),cat:document.getElementById("tCat").value,start:s,end:en});return commit("Task added for all kids")}
+});
+render();
+</script>
