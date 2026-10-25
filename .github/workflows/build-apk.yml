@@ -1,0 +1,42 @@
+# Builds an installable Android APK on GitHub's servers.
+# Download it from the repository's Actions tab → latest "Build Android APK" run → Artifacts.
+name: Build Android APK
+
+on:
+  push:
+    branches: [main]
+    paths: ['app/**', '.github/workflows/build-apk.yml']
+  workflow_dispatch:
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 3.47.6
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - run: flutter test
+      - name: Warn if Firebase is not connected yet
+        run: |
+          if grep -q "isPlaceholder = true" lib/firebase_options.dart; then
+            echo "::warning::lib/firebase_options.dart is still the placeholder. The APK installs, but sign-in will not work until the Firebase project is connected (README: Connect your Firebase project)."
+          fi
+      # Google Classroom stays hidden until Google has verified it (store/LAUNCH.md).
+      # Without android/key.properties the APK is signed with a debug key: fine for testing, not for Google Play.
+      - run: flutter build apk --release --dart-define=CLASSROOM=false
+      - uses: actions/upload-artifact@v4
+        with:
+          name: super-mom-apk
+          path: app/build/app/outputs/flutter-apk/app-release.apk
+          retention-days: 30
