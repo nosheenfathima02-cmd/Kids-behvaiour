@@ -206,8 +206,9 @@ service cloud.firestore {
     }
 
     match /pairings/{code} {
-      // Only by exact code; codes cannot be listed.
+      // Only by exact code; anyone else's codes cannot be listed.
       allow get: if signedIn();
+      allow list: if signedIn() && resource.data.createdBy == request.auth.uid;
       allow create: if code.size() >= 8
         && request.resource.data.createdBy == request.auth.uid
         && isParent(request.resource.data.familyId)

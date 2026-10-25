@@ -13,6 +13,14 @@ async function newPhone(b, name) {
       route.fulfill({ path: `${process.env.FIREBASE_JS_DIR}/${f}`, contentType: 'application/javascript' });
     });
   }
+  // Hide the emulator's "Running in emulator mode" banner; it covers the bottom of the screen.
+  await ctx.addInitScript(() => {
+    new MutationObserver(() => {
+      for (const el of document.querySelectorAll('body > div, body > p')) {
+        if (/emulator mode/i.test(el.textContent || '')) el.remove();
+      }
+    }).observe(document, { childList: true, subtree: true });
+  });
   const p = await ctx.newPage();
   p.on('pageerror', e => console.log(name, 'ERR', e.message.slice(0, 300)));
   await p.goto('http://localhost:8765/');
@@ -93,9 +101,27 @@ const shot = (p, f) => p.screenshot({ path: `${__dirname}/screenshots/${f}` });
     await shot(kid, 'e9-kid-unlinked.png');
     const kidText = await kid.evaluate(() => [...document.querySelectorAll('flt-semantics')].map(e => e.textContent).join(' '));
     console.log('KID UNLINKED:', /no longer linked/.test(kidText));
-    if (!/ticked by Aisha/.test(momText) || !/no longer linked/.test(kidText)) process.exitCode = 1;
+
+    step('mom deletes her account and all family data');
+    await tap(mom, 'Back'); // from the devices list to Settings
+    await mom.mouse.move(210, 450);
+    for (let i = 0; i < 12; i++) { await mom.mouse.wheel(0, 800); await mom.waitForTimeout(200); }
+    await tap(mom, 'Delete account and family data');
+    await tap(mom, 'Tap again to delete everything');
+    await mom.waitForTimeout(3000);
+    await shot(mom, 'e10-deleted.png');
+    const fs = await (await fetch('http://127.0.0.1:8080/v1/projects/demo-supermom/databases/(default)/documents/families', { headers: { Authorization: 'Bearer owner' } })).json();
+    const users = await (await fetch('http://127.0.0.1:9099/identitytoolkit.googleapis.com/v1/projects/demo-supermom/accounts:query', {
+      method: 'POST', headers: { Authorization: 'Bearer owner', 'Content-Type': 'application/json' }, body: '{}',
+    })).json();
+    const momLeft = (users.userInfo || []).some((u) => u.email === 'mom@example.com');
+    const deleted = !(fs.documents && fs.documents.length) && !momLeft;
+    console.log('FAMILY AND ACCOUNT DELETED:', deleted);
+
+    if (!/ticked by Aisha/.test(momText) || !/no longer linked/.test(kidText) || !deleted) process.exitCode = 1;
   } catch (e) {
     console.log('FAILED', e.message.split('\n')[0]);
+    for (const [i, pg] of b.contexts().flatMap((c) => c.pages()).entries()) await pg.screenshot({ path: `${__dirname}/screenshots/failed-${i}.png` });
     process.exitCode = 1;
   } finally {
     await b.close();

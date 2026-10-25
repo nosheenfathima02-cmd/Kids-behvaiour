@@ -1,11 +1,11 @@
 {
-    "name": "super_mom",
-    "short_name": "super_mom",
+    "name": "Super Mom",
+    "short_name": "Super Mom",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "background_color": "#0D6B5B",
+    "theme_color": "#0D6B5B",
+    "description": "A weekday routine app for Muslim families.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

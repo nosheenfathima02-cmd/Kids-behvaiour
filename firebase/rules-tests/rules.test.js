@@ -7,6 +7,8 @@ import {
   initializeTestEnvironment,
 } from '@firebase/rules-unit-testing';
 import {
+  query,
+  where,
   Timestamp,
   deleteDoc,
   deleteField,
@@ -271,5 +273,25 @@ describe('school items (homework, tests, competitions)', () => {
   test('only parents can add or move homework', async () => {
     await assertFails(updateDoc(doc(aishaTablet(), `families/${FID}`), { 'schoolItems.s_tomorrow.fromYmd': ymd(now) }));
     await assertSucceeds(updateDoc(doc(mom(), `families/${FID}`), { 'schoolItems.s_new': school('aisha', tomorrow, tomorrow, 0, 600) }));
+  });
+});
+
+describe('deleting the account', () => {
+  test('mom can delete all family data; a child device and strangers cannot', async () => {
+    await assertFails(deleteDoc(doc(aishaTablet(), `families/${FID}`)));
+    await assertFails(deleteDoc(doc(stranger(), `families/${FID}/kids/aisha`)));
+    const db = mom();
+    await assertSucceeds(deleteDoc(doc(db, `families/${FID}/kids/aisha`)));
+    await assertSucceeds(deleteDoc(doc(db, `families/${FID}/devices/dev-aisha`)));
+    await assertSucceeds(deleteDoc(doc(db, `families/${FID}`)));
+  });
+
+  test('mom can find and delete her own link codes, but not list anyone else\'s', async () => {
+    await assertSucceeds(setDoc(doc(mom(), 'pairings/MINE2345'), {
+      familyId: FID, kidIds: ['aisha'], createdBy: 'mom', expiresAt: Timestamp.fromMillis(Date.now() + 60000),
+    }));
+    await assertSucceeds(getDocs(query(collection(mom(), 'pairings'), where('createdBy', '==', 'mom'))));
+    await assertFails(getDocs(query(collection(stranger(), 'pairings'), where('createdBy', '==', 'mom'))));
+    await assertSucceeds(deleteDoc(doc(mom(), 'pairings/MINE2345')));
   });
 });

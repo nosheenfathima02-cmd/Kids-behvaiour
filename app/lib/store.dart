@@ -375,6 +375,65 @@ class AppStore extends ChangeNotifier {
   Future<void> renameDevice(LinkedDevice d, String name) =>
       _familyRef.collection('devices').doc(d.uid).update({'name': name});
 
+  /// Parent: deletes their sign-in and, if they are the only parent, the whole
+  /// family (children, ticks, devices, homework). Returns a message to show
+  /// when it could not finish, or null when everything is deleted.
+  Future<String?> deleteAccountAndData() async {
+    final user = auth.currentUser;
+    if (user == null || !isParent) {
+      return 'Only a signed-in parent can delete the account.';
+    }
+    // Firebase only deletes a sign-in that was used in the last few minutes.
+    final lastSignIn = user.metadata.lastSignInTime;
+    if (lastSignIn == null ||
+        DateTime.now().difference(lastSignIn) > const Duration(minutes: 4)) {
+      await signOut();
+      return 'For your safety, sign in again and then choose "Delete account" within 5 minutes.';
+    }
+    try {
+      final uid = user.uid;
+      final otherParents = family.parents.where((p) => p != uid).toList();
+      _stopListening();
+      if (otherParents.isNotEmpty) {
+        await _familyRef.update({'parents': otherParents});
+      } else {
+        for (final sub in ['weeks', 'kids', 'devices', 'parentTokens']) {
+          final docs = (await _familyRef.collection(sub).get()).docs;
+          for (var i = 0; i < docs.length; i += 400) {
+            final batch = db.batch();
+            for (final d in docs.skip(i).take(400)) {
+              batch.delete(d.reference);
+            }
+            await batch.commit();
+          }
+        }
+        final codes = await db
+            .collection('pairings')
+            .where('createdBy', isEqualTo: uid)
+            .get();
+        for (final d in codes.docs) {
+          await d.reference.delete();
+        }
+        await _familyRef.delete();
+      }
+      await user.delete();
+      await _prefs.clear();
+      role = null;
+      familyId = null;
+      data = null;
+      _setPhase(Phase.welcome);
+      return null;
+    } on FirebaseAuthException catch (e) {
+      if (e.code == 'requires-recent-login') {
+        await signOut();
+        return 'Your family data is deleted. Sign in once more and choose "Delete account" to remove your sign-in too.';
+      }
+      return 'Could not delete: ${e.message ?? e.code}';
+    } catch (e) {
+      return 'Could not delete: $e';
+    }
+  }
+
   /// Parent: signs out. Child's device: forgets the family (Mom has to link it again).
   Future<void> signOut() async {
     if (role == Role.device && familyId != null && auth.currentUser != null) {

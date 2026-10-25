@@ -16,6 +16,10 @@ const classroomScopes = [
   'https://www.googleapis.com/auth/classroom.coursework.me.readonly',
 ];
 
+/// Build with `--dart-define=CLASSROOM=false` to hide the Classroom import,
+/// e.g. for a store release before Google has verified the Classroom scopes.
+const classroomEnabled = bool.fromEnvironment('CLASSROOM', defaultValue: true);
+
 /// How many days ahead to import.
 const classroomDaysAhead = 14;
 

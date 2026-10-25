@@ -16,6 +16,14 @@ async function newPhone(b, name) {
       route.fulfill({ path: `${process.env.FIREBASE_JS_DIR}/${f}`, contentType: 'application/javascript' });
     });
   }
+  // Hide the emulator's "Running in emulator mode" banner; it covers the bottom of the screen.
+  await ctx.addInitScript(() => {
+    new MutationObserver(() => {
+      for (const el of document.querySelectorAll('body > div, body > p')) {
+        if (/emulator mode/i.test(el.textContent || '')) el.remove();
+      }
+    }).observe(document, { childList: true, subtree: true });
+  });
   const p = await ctx.newPage();
   p.on('pageerror', (e) => console.log(name, 'ERR', e.message.slice(0, 300)));
   await p.goto('http://localhost:8765/');

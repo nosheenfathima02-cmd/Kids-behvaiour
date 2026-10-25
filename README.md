@@ -7,6 +7,8 @@ A weekday routine app for Muslim families. Kids tick off their jobs (salah, home
 - `firebase/firestore.rules` – the security rules (what each phone is allowed to do)
 - `firebase/rules-tests/` – tests that try to break the rules
 - `firebase/functions/` – optional: push notification to Mom when a child ticks a task
+- `docs/` – public website: support page and privacy policy (GitHub Pages)
+- `store/` – store listing text, screenshots, graphics and the launch checklist (`store/LAUNCH.md`)
 
 ## Stages
 
@@ -15,7 +17,7 @@ A weekday routine app for Muslim families. Kids tick off their jobs (salah, home
 | 1 | Core app: Mom and Kid modes, several kids with themes, routine with time windows, kids tick / Mom edits, stars, time-outs, rewards, Monday reset, prayer times by city, daily reminder, Qur'an tracker, sunnah fast bonus | Done |
 | 2 | Cloud: parent sign-in (Google, Apple, email), QR linking of each child's device, live sync, server-side security rules, prayer-time reminders, push notifications to Mom | Done (needs your Firebase project to go live) |
 | 3 | School: homework and tests as tasks, Google Classroom import, competitions with practice tasks and reminders, exam-week focus timer | **Done** |
-| 4 | Testing, privacy policy, Google Play and App Store release | Needs your developer accounts |
+| 4 | Store release: icon, in-app account deletion, privacy policy, store text, screenshots, release signing | **Prepared**; the rest needs your accounts, see `store/LAUNCH.md` |
 
 ## How it works
 
@@ -93,3 +95,7 @@ Two-device tests (Mom + child's tablet in two browsers): build with `flutter bui
 - Prayer times use the phone's own time zone. Set the phones to the family's local time zone.
 - Ticks made offline sync when the device is back online; if that is more than 60 minutes after the task closed, the server refuses them and Mom can mark the task done herself.
 - A child can choose any reward from the list on their own device; the app only offers the ones their stars allow, and Mom sees the pick.
+
+## Deleting an account
+
+Settings → Delete account and family data deletes the parent's sign-in and, if they are the only parent, the whole family (children, weeks, devices, homework, link codes). Linked devices are unlinked at once.

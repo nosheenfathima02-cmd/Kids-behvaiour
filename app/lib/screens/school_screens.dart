@@ -82,43 +82,45 @@ class _SchoolTabState extends State<SchoolTab> {
       padding: const EdgeInsets.all(16),
       children: [
         KidSelector(selected: kid, onKid: widget.onKid),
-        const SizedBox(height: 12),
-        SectionCard(
-          title: 'Google Classroom',
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                kid.classroomEmail == null
-                    ? "Import ${kid.name}'s homework and tests due in the next 2 weeks. "
-                          "You sign in with ${kid.name}'s school Google account; Super Mom only reads the classwork."
-                    : 'Last imported from ${kid.classroomEmail}. Sync again whenever new work is set.',
-              ),
-              const SizedBox(height: 8),
-              if (ClassroomClient.supported)
-                FilledButton.tonalIcon(
-                  onPressed: _syncing ? null : () => _sync(store),
-                  icon: _syncing
-                      ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(Icons.sync),
-                  label: Text(
-                    kid.classroomEmail == null
-                        ? 'Connect school account'
-                        : 'Sync now',
-                  ),
-                )
-              else
-                const Text(
-                  'Classroom import works in the Android and iPhone app.',
-                  style: TextStyle(fontStyle: FontStyle.italic),
+        if (classroomEnabled) ...[
+          const SizedBox(height: 12),
+          SectionCard(
+            title: 'Google Classroom',
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  kid.classroomEmail == null
+                      ? "Import ${kid.name}'s homework and tests due in the next 2 weeks. "
+                            "You sign in with ${kid.name}'s school Google account; Super Mom only reads the classwork."
+                      : 'Last imported from ${kid.classroomEmail}. Sync again whenever new work is set.',
                 ),
-            ],
+                const SizedBox(height: 8),
+                if (ClassroomClient.supported)
+                  FilledButton.tonalIcon(
+                    onPressed: _syncing ? null : () => _sync(store),
+                    icon: _syncing
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.sync),
+                    label: Text(
+                      kid.classroomEmail == null
+                          ? 'Connect school account'
+                          : 'Sync now',
+                    ),
+                  )
+                else
+                  const Text(
+                    'Classroom import works in the Android and iPhone app.',
+                    style: TextStyle(fontStyle: FontStyle.italic),
+                  ),
+              ],
+            ),
           ),
-        ),
+        ],
         const SizedBox(height: 12),
         Wrap(
           spacing: 8,

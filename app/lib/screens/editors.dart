@@ -596,6 +596,7 @@ class SettingsScreen extends StatefulWidget {
 
 class _SettingsScreenState extends State<SettingsScreen> {
   bool _confirmReset = false;
+  bool _confirmDelete = false;
 
   Future<void> _changePin() async {
     final store = StoreScope.of(context);
@@ -774,6 +775,39 @@ class _SettingsScreenState extends State<SettingsScreen> {
               : OutlinedButton(
                   onPressed: () => setState(() => _confirmReset = true),
                   child: const Text('Start a new week now'),
+                ),
+          const Divider(height: 32),
+          Text(
+            'Delete account',
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
+          const Text(
+            'Deletes your sign-in and everything about your family: children, ticks, stars, '
+            'homework and linked devices. This cannot be undone.',
+          ),
+          const SizedBox(height: 8),
+          _confirmDelete
+              ? FilledButton(
+                  style: FilledButton.styleFrom(
+                    backgroundColor: Theme.of(context).colorScheme.error,
+                  ),
+                  onPressed: () async {
+                    final messenger = ScaffoldMessenger.of(context);
+                    Navigator.of(context).popUntil((r) => r.isFirst);
+                    final msg = await store.deleteAccountAndData();
+                    messenger.showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          msg ?? 'Your account and family data are deleted.',
+                        ),
+                      ),
+                    );
+                  },
+                  child: const Text('Tap again to delete everything'),
+                )
+              : OutlinedButton(
+                  onPressed: () => setState(() => _confirmDelete = true),
+                  child: const Text('Delete account and family data'),
                 ),
         ],
       ),
