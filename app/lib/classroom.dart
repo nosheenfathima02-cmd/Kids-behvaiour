@@ -20,6 +20,12 @@ const classroomScopes = [
 /// e.g. for a store release before Google has verified the Classroom scopes.
 const classroomEnabled = bool.fromEnvironment('CLASSROOM', defaultValue: true);
 
+/// The project's web OAuth client (google-services.json, client_type 3).
+/// Android's Google sign-in needs it because the app does not use the
+/// google-services Gradle plugin.
+const googleWebClientId =
+    '407838898643-pmh2sdvul3d29mpcoa6o7m4cli71suih.apps.googleusercontent.com';
+
 /// How many days ahead to import.
 const classroomDaysAhead = 14;
 
@@ -148,7 +154,7 @@ class ClassroomClient {
     }
     final signIn = GoogleSignIn.instance;
     if (!_initialised) {
-      await signIn.initialize();
+      await signIn.initialize(serverClientId: googleWebClientId);
       _initialised = true;
     }
     final GoogleSignInAccount account;

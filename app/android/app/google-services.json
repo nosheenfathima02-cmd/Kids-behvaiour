@@ -12,7 +12,20 @@
           "package_name": "com.supermom.super_mom"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "407838898643-si924ole4qj3rtc6p47ujgt0ti0n3hd4.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.supermom.super_mom",
+            "certificate_hash": "03af009d01b1fae80bb46b4d8cd1745aa65a6b75"
+          }
+        },
+        {
+          "client_id": "407838898643-pmh2sdvul3d29mpcoa6o7m4cli71suih.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyB3RscePe_22zRF6SLzNV37Z_i8jxdl9Iw"
@@ -20,7 +33,12 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "407838898643-pmh2sdvul3d29mpcoa6o7m4cli71suih.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }
