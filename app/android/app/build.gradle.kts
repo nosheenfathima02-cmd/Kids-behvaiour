@@ -42,6 +42,15 @@ android {
     }
 
     signingConfigs {
+        // A shared key for test APKs (GitHub builds, sideloading). It is public on
+        // purpose so every build has the same fingerprint (SHA-1) for Firebase and
+        // updates install over the previous version. Never use it for Google Play.
+        create("test") {
+            storeFile = file("test-signing.jks")
+            storePassword = "supermom-test"
+            keyAlias = "test"
+            keyPassword = "supermom-test"
+        }
         create("release") {
             keyAlias = keystoreProperties["keyAlias"] as String?
             keyPassword = keystoreProperties["keyPassword"] as String?
@@ -52,13 +61,16 @@ android {
 
     buildTypes {
         release {
-            // Uses the upload key when android/key.properties exists, otherwise
-            // the debug key so `flutter run --release` still works.
+            // The upload key when android/key.properties exists (store builds),
+            // otherwise the shared test key.
             signingConfig = if (keystorePropertiesFile.exists()) {
                 signingConfigs.getByName("release")
             } else {
-                signingConfigs.getByName("debug")
+                signingConfigs.getByName("test")
             }
+        }
+        debug {
+            signingConfig = signingConfigs.getByName("test")
         }
     }
 }

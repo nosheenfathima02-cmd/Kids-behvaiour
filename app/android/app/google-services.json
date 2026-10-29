@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "407838898643",
+    "project_id": "super-mom-43520",
+    "storage_bucket": "super-mom-43520.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:407838898643:android:c73abf2f33add179309726",
+        "android_client_info": {
+          "package_name": "com.supermom.super_mom"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB3RscePe_22zRF6SLzNV37Z_i8jxdl9Iw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
