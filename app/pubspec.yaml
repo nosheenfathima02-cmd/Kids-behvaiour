@@ -73,6 +73,11 @@ flutter:
   # the material Icons class.
   uses-material-design: true
 
+  # The adhan recording (assets/audio/adhan.mp3) is added here when provided;
+  # the APK build also copies it into the Android notification sounds.
+  assets:
+    - assets/audio/
+
   # To add assets to your application, add an assets section, like this:
   # assets:
   #   - images/a_dot_burr.jpeg

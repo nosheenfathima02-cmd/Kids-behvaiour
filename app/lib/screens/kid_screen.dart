@@ -2,8 +2,12 @@ import 'package:flutter/material.dart';
 
 import '../content.dart';
 import '../logic.dart';
+
+import 'package:just_audio/just_audio.dart';
+
 import '../main.dart';
 import '../models.dart';
+import '../notifications.dart';
 import '../prayer.dart';
 import '../quran.dart';
 import '../store.dart';
@@ -348,43 +352,56 @@ class _PrayerCard extends StatelessWidget {
         countdown(),
         style: const TextStyle(fontWeight: FontWeight.w700),
       ),
-      child: Row(
+      child: Column(
         children: [
-          for (final e in p.times.entries)
-            Expanded(
-              child: Container(
-                margin: const EdgeInsets.symmetric(horizontal: 2),
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                decoration: BoxDecoration(
-                  color: e.key == next?.key
-                      ? cs.primary
-                      : cs.surfaceContainerHighest,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Column(
-                  children: [
-                    Text(
-                      e.key.label,
+          _prayerRow(p, next, cs),
+          if (adhanSoundBundled) const _AdhanButton(),
+        ],
+      ),
+    );
+  }
+
+  Widget _prayerRow(
+    DayPrayerTimes p,
+    MapEntry<Prayer, int>? next,
+    ColorScheme cs,
+  ) {
+    return Row(
+      children: [
+        for (final e in p.times.entries)
+          Expanded(
+            child: Container(
+              margin: const EdgeInsets.symmetric(horizontal: 2),
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              decoration: BoxDecoration(
+                color: e.key == next?.key
+                    ? cs.primary
+                    : cs.surfaceContainerHighest,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Column(
+                children: [
+                  Text(
+                    e.key.label,
+                    style: TextStyle(
+                      fontWeight: FontWeight.w700,
+                      color: e.key == next?.key ? cs.onPrimary : null,
+                    ),
+                  ),
+                  FittedBox(
+                    child: Text(
+                      formatMinute(e.value),
                       style: TextStyle(
-                        fontWeight: FontWeight.w700,
+                        fontSize: 12,
                         color: e.key == next?.key ? cs.onPrimary : null,
                       ),
                     ),
-                    FittedBox(
-                      child: Text(
-                        formatMinute(e.value),
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: e.key == next?.key ? cs.onPrimary : null,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ),
-        ],
-      ),
+          ),
+      ],
     );
   }
 }
@@ -567,4 +584,54 @@ class _RewardsCard extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Plays the adhan recording inside the app.
+class _AdhanButton extends StatefulWidget {
+  const _AdhanButton();
+
+  @override
+  State<_AdhanButton> createState() => _AdhanButtonState();
+}
+
+class _AdhanButtonState extends State<_AdhanButton> {
+  final _player = AudioPlayer();
+  bool _playing = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _player.playerStateStream.listen((s) {
+      final playing =
+          s.playing && s.processingState != ProcessingState.completed;
+      if (mounted && playing != _playing) setState(() => _playing = playing);
+    });
+  }
+
+  @override
+  void dispose() {
+    _player.dispose();
+    super.dispose();
+  }
+
+  Future<void> _toggle() async {
+    if (_playing) {
+      await _player.stop();
+      return;
+    }
+    await _player.setAsset('assets/audio/adhan.mp3');
+    await _player.play();
+  }
+
+  @override
+  Widget build(BuildContext context) => Align(
+    alignment: Alignment.centerRight,
+    child: TextButton.icon(
+      onPressed: _toggle,
+      icon: Icon(
+        _playing ? Icons.stop_circle_outlined : Icons.volume_up_outlined,
+      ),
+      label: Text(_playing ? 'Stop adhan' : 'Play adhan'),
+    ),
+  );
 }

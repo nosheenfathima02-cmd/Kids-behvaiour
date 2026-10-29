@@ -34,7 +34,18 @@ jobs:
           fi
       # Google Classroom stays hidden until Google has verified it (store/LAUNCH.md).
       # Without android/key.properties the APK is signed with the shared test key: fine for testing, not for Google Play.
-      - run: flutter build apk --release --dart-define=CLASSROOM=false
+      # Adhan: when app/assets/audio/adhan.mp3 is in the repository it plays at
+      # each prayer time (Android notification sound) and from "Play adhan".
+      - name: Include the adhan recording if provided
+        run: |
+          if [ -f assets/audio/adhan.mp3 ]; then
+            mkdir -p android/app/src/main/res/raw
+            cp assets/audio/adhan.mp3 android/app/src/main/res/raw/adhan.mp3
+            echo "ADHAN_DEFINE=--dart-define=ADHAN_SOUND=true" >> "$GITHUB_ENV"
+          else
+            echo "::notice::No app/assets/audio/adhan.mp3 yet, so prayer reminders use the normal notification sound."
+          fi
+      - run: flutter build apk --release --dart-define=CLASSROOM=false $ADHAN_DEFINE
       - uses: actions/upload-artifact@v4
         with:
           name: super-mom-apk
