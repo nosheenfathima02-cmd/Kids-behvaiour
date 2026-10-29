@@ -5,9 +5,11 @@ import '../logic.dart';
 import '../main.dart';
 import '../models.dart';
 import '../prayer.dart';
+import '../quran.dart';
 import '../store.dart';
 import '../widgets.dart';
 import 'mom_screen.dart';
+import 'quran_screen.dart';
 import 'school_screens.dart';
 
 /// The lock button on the kids' screens.
@@ -493,6 +495,19 @@ class _QuranCard extends StatelessWidget {
             value: (kid.ayahDone / total).clamp(0, 1),
             minHeight: 8,
             borderRadius: BorderRadius.circular(8),
+          ),
+          const SizedBox(height: 12),
+          FilledButton.icon(
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => QuranScreen(
+                  initialSurah: surahNumberFrom(kid.surahName) ?? 1,
+                ),
+              ),
+            ),
+            icon: const Icon(Icons.headphones),
+            label: const Text('Listen & memorise with Al-Husary'),
           ),
         ],
       ),
