@@ -355,7 +355,7 @@ class _PrayerCard extends StatelessWidget {
       child: Column(
         children: [
           _prayerRow(p, next, cs),
-          if (adhanSoundBundled) const _AdhanButton(),
+          if (adhanAsset != null) const _AdhanButton(),
         ],
       ),
     );
@@ -619,7 +619,7 @@ class _AdhanButtonState extends State<_AdhanButton> {
       await _player.stop();
       return;
     }
-    await _player.setAsset('assets/audio/adhan.mp3');
+    await _player.setAsset(adhanAsset!);
     await _player.play();
   }
 

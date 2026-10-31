@@ -38,17 +38,22 @@ jobs:
           fi
       # Test builds include Google Classroom; store builds hide it with --dart-define=CLASSROOM=false until Google has verified it (store/LAUNCH.md).
       # Without android/key.properties the APK is signed with the shared test key: fine for testing, not for Google Play.
-      # Adhan: when app/assets/audio/adhan.mp3 is in the repository it plays at
-      # each prayer time (Android notification sound) and from "Play adhan".
-      - name: Include the adhan recording if provided
+      # Adhan: app/assets/audio/adhan.mp3 plays at Dhuhr, Asr, Maghrib and Isha,
+      # adhan_fajr.mp3 at Fajr (Android notification sounds) and in the app.
+      - name: Include the adhan recordings if provided
         run: |
+          mkdir -p android/app/src/main/res/raw
+          DEFINES=""
           if [ -f assets/audio/adhan.mp3 ]; then
-            mkdir -p android/app/src/main/res/raw
             cp assets/audio/adhan.mp3 android/app/src/main/res/raw/adhan.mp3
-            echo "ADHAN_DEFINE=--dart-define=ADHAN_SOUND=true" >> "$GITHUB_ENV"
-          else
-            echo "::notice::No app/assets/audio/adhan.mp3 yet, so prayer reminders use the normal notification sound."
+            DEFINES="$DEFINES --dart-define=ADHAN_SOUND=true"
           fi
+          if [ -f assets/audio/adhan_fajr.mp3 ]; then
+            cp assets/audio/adhan_fajr.mp3 android/app/src/main/res/raw/adhan_fajr.mp3
+            DEFINES="$DEFINES --dart-define=ADHAN_FAJR=true"
+          fi
+          [ -z "$DEFINES" ] && echo "::notice::No adhan recordings yet, so prayer reminders use the normal notification sound."
+          echo "ADHAN_DEFINE=$DEFINES" >> "$GITHUB_ENV"
       # Each build gets its own number, shown in the app (Settings and the welcome screen).
       - run: >-
           flutter build apk --release $ADHAN_DEFINE

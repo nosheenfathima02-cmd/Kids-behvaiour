@@ -16,10 +16,18 @@ import 'logic.dart';
 import 'models.dart';
 import 'prayer.dart';
 
-/// Build with `--dart-define=ADHAN_SOUND=true` once the adhan recording is
-/// added (android/app/src/main/res/raw/adhan.mp3 and ios/Runner/adhan.caf,
-/// at most 30 seconds on iPhone). Without it the normal notification sound plays.
+/// Set by the APK build when app/assets/audio/adhan.mp3 (Dhuhr, Asr, Maghrib,
+/// Isha) and/or adhan_fajr.mp3 (with "as-salatu khayrun min an-nawm") are in
+/// the repository. Without them the normal notification sound plays.
 const adhanSoundBundled = bool.fromEnvironment('ADHAN_SOUND');
+const fajrAdhanBundled = bool.fromEnvironment('ADHAN_FAJR');
+
+/// The adhan file for in-app playback, preferring the regular one.
+String? get adhanAsset => adhanSoundBundled
+    ? 'assets/audio/adhan.mp3'
+    : fajrAdhanBundled
+    ? 'assets/audio/adhan_fajr.mp3'
+    : null;
 
 /// A one-off reminder, e.g. the evening before a test.
 class ScheduledReminder {
@@ -92,21 +100,32 @@ class Notifications {
     }
     if (!enabled) return;
 
-    final details = NotificationDetails(
-      android: AndroidNotificationDetails(
-        adhanSoundBundled ? 'adhan' : 'salah',
-        'Salah times',
-        channelDescription: 'A reminder when each prayer time begins',
-        importance: Importance.high,
-        priority: Priority.high,
-        sound: adhanSoundBundled
-            ? const RawResourceAndroidNotificationSound('adhan')
-            : null,
-      ),
-      iOS: DarwinNotificationDetails(
-        sound: adhanSoundBundled ? 'adhan.caf' : null,
-      ),
+    // Android fixes a channel's sound when it is created, so each sound has
+    // its own channel.
+    NotificationDetails details(String? sound, String channel, String name) =>
+        NotificationDetails(
+          android: AndroidNotificationDetails(
+            sound == null ? 'salah' : channel,
+            sound == null ? 'Salah times' : name,
+            channelDescription: 'A reminder when each prayer time begins',
+            importance: Importance.high,
+            priority: Priority.high,
+            sound: sound == null
+                ? null
+                : RawResourceAndroidNotificationSound(sound),
+          ),
+          iOS: DarwinNotificationDetails(
+            sound: sound == null ? null : '$sound.caf',
+          ),
+        );
+    final regular = details(
+      adhanSoundBundled ? 'adhan' : null,
+      'adhan',
+      'Adhan',
     );
+    final fajr = fajrAdhanBundled
+        ? details('adhan_fajr', 'adhan_fajr', 'Fajr adhan')
+        : regular;
 
     final now = tz.TZDateTime.now(tz.local);
     var id = 0;
@@ -130,7 +149,7 @@ class Notifications {
         await _plugin.zonedSchedule(
           id: id++,
           scheduledDate: at,
-          notificationDetails: details,
+          notificationDetails: e.key == Prayer.fajr ? fajr : regular,
           androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
           title: "It's time for ${e.key.label}",
           body: 'Hayya ʿalaṣ-ṣalāh. Come to prayer!',
