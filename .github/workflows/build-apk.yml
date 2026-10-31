@@ -12,6 +12,12 @@ on:
 permissions:
   contents: write # to publish the APK as a release
 
+# Only the newest build runs; an older one still running is cancelled, so
+# two builds never publish the release at the same time.
+concurrency:
+  group: android-apk
+  cancel-in-progress: true
+
 jobs:
   apk:
     runs-on: ubuntu-latest

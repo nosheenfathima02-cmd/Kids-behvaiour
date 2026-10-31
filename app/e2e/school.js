@@ -143,11 +143,25 @@ const fsValue = (v) => typeof v === 'number' ? { integerValue: String(v) } : v =
       body: JSON.stringify({ fields: { schoolItems: { mapValue: { fields: { s_cw_e2e: { mapValue: { fields } } } } } } }),
     });
     if (!res.ok) throw new Error(`seeding homework failed: ${res.status} ${await res.text()}`);
+    // A teacher's announcement, as the Classroom sync stores it.
+    const notice = {
+      id: 's_an_e2e', kidId, kind: 'notice', title: 'Bring your science notebook tomorrow.', subject: 'Grade 3',
+      dueYmd: local.ymd, fromYmd: null, toYmd: null, startMin: 0, endMin: 0, source: 'classroom', link: null,
+      practiceTarget: 0, practiceDone: 0, handedIn: false, details: 'Bring your science notebook tomorrow. We start the plants project.',
+    };
+    const noticeFields = Object.fromEntries(Object.entries(notice).map(([k, v]) => [k, fsValue(v)]));
+    const res2 = await fetch(`http://127.0.0.1:8080/v1/${famPath}?updateMask.fieldPaths=schoolItems.s_an_e2e`, {
+      method: 'PATCH', headers: owner,
+      body: JSON.stringify({ fields: { schoolItems: { mapValue: { fields: { s_an_e2e: { mapValue: { fields: noticeFields } } } } } } }),
+    });
+    if (!res2.ok) throw new Error(`seeding announcement failed: ${res2.status}`);
     await kid.waitForTimeout(2500);
     await shot(kid, 's2-kid-school.png');
     const kidText = await fullText(kid);
     console.log('KID SEES HOMEWORK:', /Homework \(Maths\): Worksheet p\.42/.test(kidText));
-    console.log('KID SEES COMPETITION:', /Coming up at school/.test(kidText) && /Qur'an recitation/.test(kidText));
+    console.log('KID SEES COMPETITION:', /Qur'an recitation/.test(kidText));
+    console.log('KID SEES ENCOURAGEMENT:', /Come on, Aisha!/.test(kidText));
+    console.log('KID SEES TEACHER ANNOUNCEMENT:', /From your teacher/.test(kidText) && /science notebook/.test(kidText));
 
     step('aisha ticks the homework');
     await tap(kid, /^Mark done: Homework/);
@@ -161,7 +175,7 @@ const fsValue = (v) => typeof v === 'number' ? { integerValue: String(v) } : v =
     const momText = await fullText(mom);
     const seen = /Worksheet p\.42[^|]*\|?[^|]*ticked by Aisha/.test(momText) || (/Worksheet p\.42/.test(momText) && /ticked by Aisha/.test(momText));
     console.log('MOM SEES HOMEWORK TICK:', seen);
-    if (!seen || !/Homework \(Maths\)/.test(kidText)) process.exitCode = 1;
+    if (!seen || !/Homework \(Maths\)/.test(kidText) || !/Come on, Aisha!/.test(kidText) || !/From your teacher/.test(kidText)) process.exitCode = 1;
   } catch (e) {
     console.log('FAILED', e.message.split('\n')[0]);
     process.exitCode = 1;
