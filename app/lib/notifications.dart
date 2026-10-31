@@ -10,6 +10,9 @@ import 'package:flutter_timezone/flutter_timezone.dart';
 import 'package:timezone/data/latest.dart' as tzdata;
 import 'package:timezone/timezone.dart' as tz;
 
+import 'package:shared_preferences/shared_preferences.dart';
+
+import 'logic.dart';
 import 'models.dart';
 import 'prayer.dart';
 
@@ -134,6 +137,48 @@ class Notifications {
         );
       }
     }
+  }
+
+  /// Shows a notification for each teacher announcement this phone has not
+  /// shown before (posted in the last 2 days, so old ones never pile up).
+  static Future<void> announceNotices(
+    List<SchoolItem> notices,
+    String Function(String kidId) kidName,
+  ) async {
+    if (!await _init()) return;
+    final prefs = await SharedPreferences.getInstance();
+    final seen = (prefs.getStringList('seen_notices') ?? const []).toSet();
+    final now = DateTime.now();
+    var id = 900;
+    for (final n in notices) {
+      if (seen.contains(n.id)) continue;
+      if (now.difference(dateFromYmd(n.dueYmd)).inDays <= 2) {
+        final name = kidName(n.kidId);
+        await _plugin.show(
+          id: id++,
+          title:
+              '📣 ${n.subject.isEmpty ? 'Teacher' : n.subject}${name.isEmpty ? '' : ' · $name'}',
+          body: n.details.isEmpty ? n.title : n.details,
+          notificationDetails: const NotificationDetails(
+            android: AndroidNotificationDetails(
+              'announcements',
+              'Teacher announcements',
+              channelDescription: 'New announcements from Google Classroom',
+              importance: Importance.high,
+              priority: Priority.high,
+              styleInformation: BigTextStyleInformation(''),
+            ),
+            iOS: DarwinNotificationDetails(),
+          ),
+        );
+      }
+      seen.add(n.id);
+    }
+    final keep = seen.toList();
+    await prefs.setStringList(
+      'seen_notices',
+      keep.length > 200 ? keep.sublist(keep.length - 200) : keep,
+    );
   }
 
   /// Saves this phone's push token so the parents hear when a child ticks a

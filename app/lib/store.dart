@@ -93,6 +93,7 @@ class AppStore extends ChangeNotifier {
   Timer? _ticker;
   String _maintainedDay = '';
   String _scheduledFor = '';
+  String _announcedKey = '';
 
   static Future<AppStore> load({
     FirebaseFirestore? db,
@@ -659,6 +660,12 @@ class AppStore extends ChangeNotifier {
         enabled: family.adhanEnabled,
         reminders: reminders,
       );
+    }
+    final notices = [for (final k in visibleKids) ...noticesFor(k)];
+    final noticeKey = notices.map((n) => n.id).join(',');
+    if (noticeKey != _announcedKey) {
+      _announcedKey = noticeKey;
+      Notifications.announceNotices(notices, (id) => kidById(id)?.name ?? '');
     }
     if (!isParent || _maintainedDay == today) return;
     _maintainedDay = today;
