@@ -363,9 +363,20 @@ class ClassroomException implements Exception {
   String toString() => message;
 }
 
-class ClassroomClient {
-  static bool _initialised = false;
+bool _googleSignInReady = false;
 
+/// Google's own sign-in (used for the parent's "Continue with Google" on
+/// phones and for the Classroom import). Initialised once per app run.
+Future<GoogleSignIn> googleSignIn() async {
+  final signIn = GoogleSignIn.instance;
+  if (!_googleSignInReady) {
+    await signIn.initialize(serverClientId: googleWebClientId);
+    _googleSignInReady = true;
+  }
+  return signIn;
+}
+
+class ClassroomClient {
   /// Google sign-in for Classroom works in the Android and iPhone apps.
   static bool get supported =>
       !kIsWeb &&
@@ -384,11 +395,7 @@ class ClassroomClient {
     if (!supported) {
       throw ClassroomException('Google Classroom works in the phone app.');
     }
-    final signIn = GoogleSignIn.instance;
-    if (!_initialised) {
-      await signIn.initialize(serverClientId: googleWebClientId);
-      _initialised = true;
-    }
+    final signIn = await googleSignIn();
     final GoogleSignInAccount account;
     if (!interactive) {
       final quiet = await signIn.attemptLightweightAuthentication(

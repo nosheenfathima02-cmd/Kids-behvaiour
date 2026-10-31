@@ -5,6 +5,7 @@ import 'dart:math';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:crypto/crypto.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -184,7 +185,37 @@ class AppStore extends ChangeNotifier {
 
   // ---------------- parent sign-in & setup ----------------
 
-  Future<void> signInWithGoogle() => _signInWith(GoogleAuthProvider());
+  /// On phones this uses Google's account picker and hands its token to
+  /// Firebase. (Firebase's own web-based Google window fails on some Android
+  /// phones with "Failed to generate/retrieve public encryption key".)
+  Future<void> signInWithGoogle() async {
+    if (kIsWeb) return _signInWith(GoogleAuthProvider());
+    final signIn = await googleSignIn();
+    final GoogleSignInAccount account;
+    try {
+      await signIn.signOut(); // always offer the account list
+      account = await signIn.authenticate();
+    } on GoogleSignInException catch (e) {
+      throw FirebaseAuthException(
+        code: e.code == GoogleSignInExceptionCode.canceled
+            ? 'canceled'
+            : 'google-sign-in-failed',
+        message: e.description ?? 'Google sign-in did not work.',
+      );
+    }
+    final idToken = account.authentication.idToken;
+    if (idToken == null) {
+      throw FirebaseAuthException(
+        code: 'google-sign-in-failed',
+        message: 'Google did not return a sign-in token.',
+      );
+    }
+    await auth.signInWithCredential(
+      GoogleAuthProvider.credential(idToken: idToken),
+    );
+    await _afterParentSignIn();
+  }
+
   Future<void> signInWithApple() => _signInWith(AppleAuthProvider());
 
   Future<void> _signInWith(AuthProvider provider) async {
