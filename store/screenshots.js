@@ -37,9 +37,15 @@ async function seed() {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email: 'mom@example.com', password: 'bismillah123', returnSecureToken: true }),
   })).json();
+  // Email sign-ups must be confirmed; mark the demo account as confirmed.
+  await fetch(`${AUTH}/identitytoolkit.googleapis.com/v1/projects/demo-supermom/accounts:update`, {
+    method: 'POST', headers: { Authorization: 'Bearer owner', 'Content-Type': 'application/json' },
+    body: JSON.stringify({ localId: signUp.localId, emailVerified: true }),
+  });
   const demo = JSON.parse(fs.readFileSync(demoFile, 'utf8'));
   demo.family.parents = [signUp.localId];
   await put('families/demo', demo.family);
+  await put(`families/demo/parents/${signUp.localId}`, { name: 'Nousheen', phone: '+974 5512 3456', email: 'mom@example.com' });
   for (const [id, kid] of Object.entries(demo.kids)) await put(`families/demo/kids/${id}`, kid);
   for (const [id, week] of Object.entries(demo.weeks)) await put(`families/demo/weeks/${id}`, week);
 }

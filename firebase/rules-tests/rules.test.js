@@ -59,8 +59,9 @@ const schoolItems = {
   s_reminderOnly: school('aisha', null, null, 0, 1439),
 };
 
-const mom = () => env.authenticatedContext('mom', { firebase: { sign_in_provider: 'google.com' } }).firestore();
-const stranger = () => env.authenticatedContext('eve', { firebase: { sign_in_provider: 'google.com' } }).firestore();
+const mom = () => env.authenticatedContext('mom', { email_verified: true, firebase: { sign_in_provider: 'google.com' } }).firestore();
+const stranger = () => env.authenticatedContext('eve', { email_verified: true, firebase: { sign_in_provider: 'google.com' } }).firestore();
+const unconfirmed = () => env.authenticatedContext('newmom', { email_verified: false, firebase: { sign_in_provider: 'password' } }).firestore();
 const device = (uid) => env.authenticatedContext(uid, { firebase: { sign_in_provider: 'anonymous' } }).firestore();
 const aishaTablet = () => device('dev-aisha');
 
@@ -293,5 +294,23 @@ describe('deleting the account', () => {
     await assertSucceeds(getDocs(query(collection(mom(), 'pairings'), where('createdBy', '==', 'mom'))));
     await assertFails(getDocs(query(collection(stranger(), 'pairings'), where('createdBy', '==', 'mom'))));
     await assertSucceeds(deleteDoc(doc(mom(), 'pairings/MINE2345')));
+  });
+});
+
+describe('parents', () => {
+  test('an email account that is not confirmed yet cannot create or read a family', async () => {
+    await assertFails(setDoc(doc(unconfirmed(), 'families/newfam'), { parents: ['newmom'] }));
+    await env.withSecurityRulesDisabled((ctx) => updateDoc(doc(ctx.firestore(), `families/${FID}`), { parents: ['mom', 'newmom'] }));
+    await assertFails(getDoc(doc(unconfirmed(), `families/${FID}`)));
+  });
+
+  test("a parent's name and phone are private to the family's parents", async () => {
+    const profile = { name: 'Nousheen', phone: '+974 5512 3456', email: 'mom@example.com' };
+    await assertSucceeds(setDoc(doc(mom(), `families/${FID}/parents/mom`), profile));
+    await assertSucceeds(getDoc(doc(mom(), `families/${FID}/parents/mom`)));
+    await assertFails(getDoc(doc(aishaTablet(), `families/${FID}/parents/mom`)));
+    await assertFails(getDoc(doc(stranger(), `families/${FID}/parents/mom`)));
+    await assertFails(setDoc(doc(mom(), `families/${FID}/parents/someoneElse`), profile));
+    await assertFails(setDoc(doc(mom(), `families/${FID}/parents/mom`), { ...profile, isAdmin: true }));
   });
 });

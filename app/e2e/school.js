@@ -95,6 +95,15 @@ const fsValue = (v) => typeof v === 'number' ? { integerValue: String(v) } : typ
     await type(mom, 'Password', 'bismillah123');
     await tap(mom, 'Create account', { exact: true });
     await mom.waitForTimeout(2500);
+    step('mom confirms her email with the link');
+    const codes = await (await fetch('http://127.0.0.1:9099/emulator/v1/projects/demo-supermom/oobCodes')).json();
+    const verify = codes.oobCodes.filter((c) => c.requestType === 'VERIFY_EMAIL' && c.email === 'mom@example.com').pop();
+    if (!verify) throw new Error('no confirmation email was sent');
+    await fetch(verify.oobLink);
+    await tap(mom, "I've confirmed my email");
+    await mom.waitForTimeout(2500);
+    await type(mom, 'Your name', 'Nousheen');
+    await type(mom, 'Phone number', '+974 5512 3456');
     await type(mom, 'PIN (4 to 6 digits)', '1234');
     await type(mom, 'Type the PIN again', '1234');
     await type(mom, 'First name', 'Aisha');

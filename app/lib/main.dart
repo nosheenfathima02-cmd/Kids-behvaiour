@@ -106,6 +106,8 @@ class _Root extends StatelessWidget {
       Phase.welcome => const WelcomeScreen(),
       Phase.parentNeedsFamily => const SetupScreen(),
       Phase.parentNeedsPin => const SetPinScreen(),
+      Phase.parentNeedsVerification => const VerifyEmailScreen(),
+      Phase.parentNeedsProfile => const ParentProfileScreen(),
       Phase.deviceUnlinked => const UnlinkedScreen(),
       Phase.ready => const KidEntryScreen(),
     };

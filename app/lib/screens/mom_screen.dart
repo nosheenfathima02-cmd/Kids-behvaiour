@@ -44,7 +44,11 @@ class _MomScreenState extends State<MomScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Parent'),
+        title: Text(
+          store.parentName.isEmpty
+              ? 'Parent'
+              : 'Salam, ${store.parentName.split(' ').first}',
+        ),
         actions: [
           IconButton(
             tooltip: 'Settings',

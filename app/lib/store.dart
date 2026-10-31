@@ -30,6 +30,12 @@ enum Phase {
   /// A parent's family exists but this phone has no parent PIN yet.
   parentNeedsPin,
 
+  /// A parent signed up with email and has not tapped the confirmation link yet.
+  parentNeedsVerification,
+
+  /// A parent has not given their name and phone number yet.
+  parentNeedsProfile,
+
   ready,
 
   /// Mom removed this child's device from the family.
@@ -78,6 +84,10 @@ class AppStore extends ChangeNotifier {
   /// Linked children's devices (parent only).
   List<LinkedDevice> devices = [];
 
+  /// This parent's name and phone (families/{fid}/parents/{uid}); parents only.
+  Map<String, dynamic>? parentProfile;
+  bool _profileLoaded = false;
+
   /// The kids this device may act for (child device only).
   List<String> deviceKidIds = [];
   String deviceName = '';
@@ -120,6 +130,11 @@ class AppStore extends ChangeNotifier {
       role = Role.device;
       _listenAsDevice();
     } else if (user != null && !user.isAnonymous) {
+      if (needsEmailVerification) {
+        role = Role.parent;
+        _setPhase(Phase.parentNeedsVerification);
+        return;
+      }
       await _afterParentSignIn();
     } else {
       _setPhase(Phase.welcome);
@@ -233,15 +248,75 @@ class AppStore extends ChangeNotifier {
     required bool newAccount,
   }) async {
     if (newAccount) {
-      await auth.createUserWithEmailAndPassword(
+      final cred = await auth.createUserWithEmailAndPassword(
         email: email,
         password: password,
       );
+      await cred.user?.sendEmailVerification();
     } else {
       await auth.signInWithEmailAndPassword(email: email, password: password);
     }
+    if (needsEmailVerification) {
+      role = Role.parent;
+      _setPhase(Phase.parentNeedsVerification);
+      return;
+    }
     await _afterParentSignIn();
   }
+
+  /// Email-and-password accounts must confirm their address first. Google
+  /// and Apple accounts are already confirmed.
+  bool get needsEmailVerification {
+    final user = auth.currentUser;
+    return user != null &&
+        !user.isAnonymous &&
+        !user.emailVerified &&
+        user.providerData.any((p) => p.providerId == 'password');
+  }
+
+  String get signedInEmail => auth.currentUser?.email ?? '';
+
+  Future<void> resendVerificationEmail() async =>
+      auth.currentUser?.sendEmailVerification();
+
+  /// After the parent tapped the link: returns false if not confirmed yet.
+  Future<bool> checkEmailVerified() async {
+    await auth.currentUser?.reload();
+    if (needsEmailVerification) return false;
+    await auth.currentUser?.getIdToken(true); // so the server sees it too
+    await _afterParentSignIn();
+    return true;
+  }
+
+  static final _phonePattern = RegExp(r'^\+?[0-9 ()-]{7,20}$');
+
+  /// Null when fine, otherwise what to fix.
+  static String? checkPhone(String phone) {
+    final digits = phone.replaceAll(RegExp(r'[^0-9]'), '');
+    if (!_phonePattern.hasMatch(phone.trim()) ||
+        digits.length < 7 ||
+        digits.length > 15) {
+      return 'Enter a phone number with country code, e.g. +974 5512 3456';
+    }
+    return null;
+  }
+
+  DocumentReference<Map<String, dynamic>> get _myProfileRef =>
+      _familyRef.collection('parents').doc(auth.currentUser!.uid);
+
+  Future<void> saveParentProfile(String name, String phone) async {
+    final data = {
+      'name': name.trim(),
+      'phone': phone.trim(),
+      'email': auth.currentUser?.email ?? '',
+      'updatedAt': FieldValue.serverTimestamp(),
+    };
+    await _myProfileRef.set(data);
+    parentProfile = data;
+    _rebuild();
+  }
+
+  String get parentName => (parentProfile?['name'] as String?) ?? '';
 
   Future<void> _afterParentSignIn() async {
     final user = auth.currentUser!;
@@ -262,6 +337,8 @@ class AppStore extends ChangeNotifier {
   }
 
   Future<void> createFamily({
+    required String parentName,
+    required String phone,
     required String pin,
     required City city,
     required String kidName,
@@ -295,6 +372,7 @@ class AppStore extends ChangeNotifier {
     );
     await ref.collection('kids').doc(kid.id).set(kid.profileJson());
     familyId = ref.id;
+    await saveParentProfile(parentName, phone);
     await _prefs.setString(_familyKey, ref.id);
     await _prefs.setString(_pinKey, _hashPin(pin));
     _listenAsParent();
@@ -434,7 +512,13 @@ class AppStore extends ChangeNotifier {
       if (otherParents.isNotEmpty) {
         await _familyRef.update({'parents': otherParents});
       } else {
-        for (final sub in ['weeks', 'kids', 'devices', 'parentTokens']) {
+        for (final sub in [
+          'weeks',
+          'kids',
+          'devices',
+          'parentTokens',
+          'parents',
+        ]) {
           final docs = (await _familyRef.collection(sub).get()).docs;
           for (var i = 0; i < docs.length; i += 400) {
             final batch = db.batch();
@@ -524,6 +608,14 @@ class AppStore extends ChangeNotifier {
             ),
         ];
         notifyListeners();
+      }, onError: _onListenError),
+    );
+    _profileLoaded = false;
+    _subs.add(
+      _myProfileRef.snapshots().listen((s) {
+        parentProfile = s.data();
+        _profileLoaded = true;
+        _rebuild();
       }, onError: _onListenError),
     );
     _listenToWeeksAsParent();
@@ -631,6 +723,8 @@ class AppStore extends ChangeNotifier {
     _familyDoc = null;
     devices = [];
     deviceKidIds = [];
+    parentProfile = null;
+    _profileLoaded = false;
   }
 
   /// Keeps the same Kid object, so open screens update in place.
@@ -650,6 +744,10 @@ class AppStore extends ChangeNotifier {
     data = FamilyData.fromDoc(familyId!, doc, kids);
     if (isParent && !hasPin) {
       _setPhase(Phase.parentNeedsPin);
+      return;
+    }
+    if (isParent && _profileLoaded && parentProfile == null) {
+      _setPhase(Phase.parentNeedsProfile);
       return;
     }
     _setPhase(Phase.ready);
