@@ -123,9 +123,11 @@ class Notifications {
       'adhan',
       'Adhan',
     );
+    // The regular adhan lacks "as-salatu khayrun min an-nawm", so Fajr keeps
+    // the plain sound until a Fajr recording is added.
     final fajr = fajrAdhanBundled
         ? details('adhan_fajr', 'adhan_fajr', 'Fajr adhan')
-        : regular;
+        : details(null, 'salah', 'Salah times');
 
     final now = tz.TZDateTime.now(tz.local);
     var id = 0;
