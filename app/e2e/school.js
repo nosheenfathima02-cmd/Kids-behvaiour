@@ -116,6 +116,8 @@ const fsValue = (v) => typeof v === 'number' ? { integerValue: String(v) } : typ
     await mom.waitForTimeout(2500);
     await type(mom, 'Your name', 'Nousheen');
     await type(mom, 'Phone number', '+974 5512 3456');
+    await mom.getByRole('checkbox', { name: /18 years or older/ }).first().click({ force: true });
+    await mom.waitForTimeout(300);
     await type(mom, 'PIN (4 to 6 digits)', '1234');
     await type(mom, 'Type the PIN again', '1234');
     await type(mom, 'First name', 'Aisha');

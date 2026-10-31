@@ -309,6 +309,8 @@ class AppStore extends ChangeNotifier {
       'name': name.trim(),
       'phone': phone.trim(),
       'email': auth.currentUser?.email ?? '',
+      // Confirmed on the sign-up form (the form cannot be sent without it).
+      'adultConfirmed': true,
       'updatedAt': FieldValue.serverTimestamp(),
     };
     await _myProfileRef.set(data);
@@ -746,7 +748,9 @@ class AppStore extends ChangeNotifier {
       _setPhase(Phase.parentNeedsPin);
       return;
     }
-    if (isParent && _profileLoaded && parentProfile == null) {
+    if (isParent &&
+        _profileLoaded &&
+        parentProfile?['adultConfirmed'] != true) {
       _setPhase(Phase.parentNeedsProfile);
       return;
     }

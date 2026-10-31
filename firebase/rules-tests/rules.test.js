@@ -305,7 +305,8 @@ describe('parents', () => {
   });
 
   test("a parent's name and phone are private to the family's parents", async () => {
-    const profile = { name: 'Nousheen', phone: '+974 5512 3456', email: 'mom@example.com' };
+    const profile = { name: 'Nousheen', phone: '+974 5512 3456', email: 'mom@example.com', adultConfirmed: true };
+    await assertFails(setDoc(doc(mom(), `families/${FID}/parents/mom`), { ...profile, adultConfirmed: false }));
     await assertSucceeds(setDoc(doc(mom(), `families/${FID}/parents/mom`), profile));
     await assertSucceeds(getDoc(doc(mom(), `families/${FID}/parents/mom`)));
     await assertFails(getDoc(doc(aishaTablet(), `families/${FID}/parents/mom`)));

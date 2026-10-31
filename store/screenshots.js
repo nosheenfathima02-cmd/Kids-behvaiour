@@ -45,7 +45,7 @@ async function seed() {
   const demo = JSON.parse(fs.readFileSync(demoFile, 'utf8'));
   demo.family.parents = [signUp.localId];
   await put('families/demo', demo.family);
-  await put(`families/demo/parents/${signUp.localId}`, { name: 'Nousheen', phone: '+974 5512 3456', email: 'mom@example.com' });
+  await put(`families/demo/parents/${signUp.localId}`, { name: 'Nousheen', phone: '+974 5512 3456', email: 'mom@example.com', adultConfirmed: true });
   for (const [id, kid] of Object.entries(demo.kids)) await put(`families/demo/kids/${id}`, kid);
   for (const [id, week] of Object.entries(demo.weeks)) await put(`families/demo/weeks/${id}`, week);
 }

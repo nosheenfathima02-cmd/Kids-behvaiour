@@ -317,6 +317,35 @@ class ParentDetailsFields extends StatelessWidget {
         autofillHints: const [AutofillHints.telephoneNumber],
         validator: (v) => AppStore.checkPhone(v ?? ''),
       ),
+      const SizedBox(height: 8),
+      // Only adults may create the family account; children never sign up.
+      FormField<bool>(
+        initialValue: false,
+        validator: (v) => v == true ? null : 'Please confirm to continue',
+        builder: (field) => Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            CheckboxListTile(
+              key: const Key('adultConfirm'),
+              contentPadding: EdgeInsets.zero,
+              controlAffinity: ListTileControlAffinity.leading,
+              value: field.value ?? false,
+              onChanged: field.didChange,
+              title: const Text(
+                "I am the child's parent or legal guardian, and I am 18 years or older.",
+              ),
+            ),
+            if (field.hasError)
+              Text(
+                field.errorText!,
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.error,
+                  fontSize: 12,
+                ),
+              ),
+          ],
+        ),
+      ),
     ],
   );
 }
