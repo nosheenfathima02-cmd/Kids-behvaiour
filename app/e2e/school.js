@@ -102,9 +102,14 @@ const fsValue = (v) => typeof v === 'number' ? { integerValue: String(v) } : typ
     const mom = await newPhone(b, 'MOM');
     step('mom signs up and creates the family');
     await tap(mom, "I'm a parent");
-    await tap(mom, 'New account');
+    await tap(mom, 'Create an account');
+    await type(mom, 'Full name', 'Nousheen');
     await type(mom, 'Email', 'mom@example.com');
+    await type(mom, 'Phone number', '+974 5512 3456');
     await type(mom, 'Password', 'bismillah123');
+    await type(mom, 'Confirm password', 'bismillah123');
+    await mom.getByRole('checkbox', { name: /18 years or older/ }).first().click({ force: true });
+    await mom.waitForTimeout(300);
     await tap(mom, 'Create account', { exact: true });
     await mom.waitForTimeout(2500);
     step('mom confirms her email with the link');
@@ -114,10 +119,7 @@ const fsValue = (v) => typeof v === 'number' ? { integerValue: String(v) } : typ
     await fetch(verify.oobLink);
     await tap(mom, "I've confirmed my email");
     await mom.waitForTimeout(2500);
-    await type(mom, 'Your name', 'Nousheen');
-    await type(mom, 'Phone number', '+974 5512 3456');
-    await mom.getByRole('checkbox', { name: /18 years or older/ }).first().click({ force: true });
-    await mom.waitForTimeout(300);
+    // Name, phone and the 18+ confirmation come pre-filled from the sign-up form.
     await type(mom, 'PIN (4 to 6 digits)', '1234');
     await type(mom, 'Type the PIN again', '1234');
     await type(mom, 'First name', 'Aisha');

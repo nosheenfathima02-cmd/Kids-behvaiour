@@ -25,6 +25,17 @@ class _SetupScreenState extends State<SetupScreen> {
   City _city = cities.firstWhere((c) => c.name == 'Dubai');
 
   bool _busy = false;
+  bool _prefilled = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_prefilled) return;
+    _prefilled = true;
+    final store = StoreScope.of(context);
+    _parentName.text = store.suggestedName;
+    _phone.text = store.suggestedPhone;
+  }
 
   Future<void> _finish() async {
     if (!_form.currentState!.validate()) return;
@@ -83,7 +94,12 @@ class _SetupScreenState extends State<SetupScreen> {
                   ),
                   const SizedBox(height: 24),
                   Text('1. About you', style: text.titleMedium),
-                  ParentDetailsFields(name: _parentName, phone: _phone),
+                  ParentDetailsFields(
+                    name: _parentName,
+                    phone: _phone,
+                    adultConfirmed: StoreScope.of(context)
+                        .adultAlreadyConfirmed,
+                  ),
                   const SizedBox(height: 16),
                   Text('2. Parent PIN', style: text.titleMedium),
                   const Text(
@@ -292,9 +308,13 @@ class ParentDetailsFields extends StatelessWidget {
     super.key,
     required this.name,
     required this.phone,
+    this.adultConfirmed = false,
   });
   final TextEditingController name;
   final TextEditingController phone;
+
+  /// Already ticked on the "Create an account" form.
+  final bool adultConfirmed;
 
   @override
   Widget build(BuildContext context) => Column(
@@ -320,7 +340,7 @@ class ParentDetailsFields extends StatelessWidget {
       const SizedBox(height: 8),
       // Only adults may create the family account; children never sign up.
       FormField<bool>(
-        initialValue: false,
+        initialValue: adultConfirmed,
         validator: (v) => v == true ? null : 'Please confirm to continue',
         builder: (field) => Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -472,6 +492,19 @@ class _ParentProfileScreenState extends State<ParentProfileScreen> {
   final _name = TextEditingController();
   final _phone = TextEditingController();
   bool _busy = false;
+  bool _prefilled = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_prefilled) return;
+    _prefilled = true;
+    final store = StoreScope.of(context);
+    _name.text =
+        (store.parentProfile?['name'] as String?) ?? store.suggestedName;
+    _phone.text =
+        (store.parentProfile?['phone'] as String?) ?? store.suggestedPhone;
+  }
 
   Future<void> _save() async {
     if (!_form.currentState!.validate()) return;

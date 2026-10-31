@@ -390,4 +390,28 @@ void main() {
       isFalse,
     );
   });
+
+  group('Classroom error messages', () {
+    test('API not switched on in Google Cloud', () {
+      const body =
+          '{"error":{"code":403,"message":"Google Classroom API has not been used in project 407838898643 before or it is disabled.","status":"PERMISSION_DENIED","details":[{"@type":"type.googleapis.com/google.rpc.ErrorInfo","reason":"SERVICE_DISABLED"}]}}';
+      expect(classroomErrorMessage(403, body), contains('Enable'));
+    });
+    test('permissions not granted', () {
+      const body =
+          '{"error":{"code":403,"message":"Request had insufficient authentication scopes.","status":"PERMISSION_DENIED","details":[{"reason":"ACCESS_TOKEN_SCOPE_INSUFFICIENT"}]}}';
+      expect(classroomErrorMessage(403, body), contains('Data access'));
+    });
+    test('school turned it off', () {
+      const body =
+          '{"error":{"code":403,"message":"@ClassroomApiDisabled The user is not permitted to access the Classroom API.","status":"PERMISSION_DENIED"}}';
+      expect(classroomErrorMessage(403, body), contains('Admin console'));
+    });
+    test('anything else shows Google\'s own words', () {
+      expect(
+        classroomErrorMessage(500, '{"error":{"message":"Backend error"}}'),
+        contains('Backend error'),
+      );
+    });
+  });
 }

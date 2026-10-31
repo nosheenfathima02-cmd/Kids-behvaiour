@@ -264,6 +264,48 @@ class AppStore extends ChangeNotifier {
     await _afterParentSignIn();
   }
 
+  static const _pendingNameKey = 'pending_name';
+  static const _pendingPhoneKey = 'pending_phone';
+  static const _pendingAdultKey = 'pending_adult';
+
+  /// "Create an account": name, phone and the 18+ confirmation are kept on
+  /// this phone until the family is set up (the server only accepts them
+  /// once the email is confirmed).
+  Future<void> createParentAccount({
+    required String name,
+    required String email,
+    required String phone,
+    required String password,
+  }) async {
+    final cred = await auth.createUserWithEmailAndPassword(
+      email: email.trim(),
+      password: password,
+    );
+    await cred.user?.updateDisplayName(name.trim());
+    await _prefs.setString(_pendingNameKey, name.trim());
+    await _prefs.setString(_pendingPhoneKey, phone.trim());
+    await _prefs.setBool(_pendingAdultKey, true);
+    await cred.user?.sendEmailVerification();
+    role = Role.parent;
+    await _prefs.setString(_roleKey, Role.parent.name);
+    if (needsEmailVerification) {
+      _setPhase(Phase.parentNeedsVerification);
+      return;
+    }
+    await _afterParentSignIn();
+  }
+
+  /// Prefills "About you" with what the parent already gave (sign-up form or
+  /// their Google account).
+  String get suggestedName =>
+      _prefs.getString(_pendingNameKey) ?? auth.currentUser?.displayName ?? '';
+  String get suggestedPhone =>
+      _prefs.getString(_pendingPhoneKey) ?? auth.currentUser?.phoneNumber ?? '';
+  bool get adultAlreadyConfirmed => _prefs.getBool(_pendingAdultKey) ?? false;
+
+  Future<void> sendPasswordReset(String email) =>
+      auth.sendPasswordResetEmail(email: email.trim());
+
   /// Email-and-password accounts must confirm their address first. Google
   /// and Apple accounts are already confirmed.
   bool get needsEmailVerification {
@@ -314,6 +356,9 @@ class AppStore extends ChangeNotifier {
       'updatedAt': FieldValue.serverTimestamp(),
     };
     await _myProfileRef.set(data);
+    for (final k in [_pendingNameKey, _pendingPhoneKey, _pendingAdultKey]) {
+      await _prefs.remove(k);
+    }
     parentProfile = data;
     _rebuild();
   }

@@ -364,6 +364,43 @@ class ClassroomResult {
   final List<ClassroomNotice> notices;
 }
 
+/// Explains what Google Classroom's error means and how to fix it.
+String classroomErrorMessage(int status, String body) {
+  var message = '';
+  var reason = '';
+  try {
+    final err = asMap(asMap(jsonDecode(body))['error']);
+    message = (err['message'] as String?) ?? '';
+    for (final d in (err['details'] as List?) ?? const []) {
+      reason = '$reason ${asMap(d)['reason'] ?? ''}';
+    }
+    reason = '$reason ${err['status'] ?? ''}';
+  } catch (_) {}
+  final all = '$message $reason';
+  if (all.contains('SERVICE_DISABLED') ||
+      all.contains('has not been used in project') ||
+      all.contains('is disabled')) {
+    return 'Google Classroom is not switched on for Super Mom yet. In Google Cloud (project super-mom-43520), '
+        'open "APIs & Services", search "Google Classroom API" and click Enable. Then connect again.';
+  }
+  if (all.contains('ACCESS_TOKEN_SCOPE_INSUFFICIENT') ||
+      all.contains('insufficient authentication scopes')) {
+    return 'Classroom permissions were not given. Add the 3 Classroom permissions under Google Auth Platform → '
+        'Data access, then tap Connect again and tick every box Google shows.';
+  }
+  if (all.contains('ClassroomApiDisabled') ||
+      all.contains('@ClassroomApiDisabled')) {
+    return "This school's Google admin has turned off Classroom access for apps. The admin can allow it in the "
+        'Admin console (Apps → Google Workspace → Classroom → Data access).';
+  }
+  if (status == 401) return 'Google sign-in expired. Tap Connect again.';
+  if (status == 403) {
+    return "This account isn't allowed to share Classroom with Super Mom"
+        '${message.isEmpty ? '' : ' ($message)'}. If it is a school account, the school admin may need to trust the app.';
+  }
+  return 'Google Classroom answered $status${message.isEmpty ? '' : ': $message'}';
+}
+
 class ClassroomException implements Exception {
   ClassroomException(this.message);
   final String message;
@@ -452,15 +489,9 @@ class ClassroomClient {
     ]) async {
       final uri = Uri.https('classroom.googleapis.com', path, query);
       final res = await http.get(uri, headers: headers);
-      if (res.statusCode == 403 || res.statusCode == 401) {
-        throw ClassroomException(
-          "This school account can't share Classroom with other apps. "
-          "The school's Google admin may need to allow Super Mom. You can still add homework by hand.",
-        );
-      }
       if (res.statusCode != 200) {
         throw ClassroomException(
-          'Google Classroom answered ${res.statusCode}.',
+          classroomErrorMessage(res.statusCode, res.body),
         );
       }
       return asMap(jsonDecode(res.body));
