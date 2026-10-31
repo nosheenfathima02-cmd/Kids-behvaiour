@@ -25,6 +25,7 @@ async function newPhone(b, name) {
     }).observe(document, { childList: true, subtree: true });
   });
   const p = await ctx.newPage();
+  await p.clock.install();
   p.on('pageerror', (e) => console.log(name, 'ERR', e.message.slice(0, 300)));
   await p.goto('http://localhost:8765/');
   await p.waitForTimeout(3500);
@@ -39,9 +40,7 @@ const tap = async (p, name, opts = {}) => {
 };
 const type = async (p, label, text) => {
   const f = p.locator(`input[aria-label="${label}"], textarea[aria-label="${label}"]`).or(p.getByRole('textbox', { name: label })).first();
-  await f.click({ force: true, timeout: 5000 });
-  await p.keyboard.type(text);
-  await p.waitForTimeout(200);
+  await f.click({ force: true, timeout: 5000 }); await p.waitForTimeout(400); await p.keyboard.type(text, { delay: 30 }); await p.waitForTimeout(300);
 };
 const tab = async (p, name) => {
   console.log('  tab', name);
@@ -65,23 +64,27 @@ const fullText = async (p) => {
 };
 const shot = (p, f) => p.screenshot({ path: `${__dirname}/screenshots/${f}` });
 
+// On a weekend the test moves both phones (and the family's time zone, which
+// the security rules use) forward to Monday, because school tasks only open
+// on school days. Set after the devices are linked: link codes are checked
+// against the server's real clock.
+let SHIFT_MS = 0;
+const realWeekday = () => new Intl.DateTimeFormat('en-GB', { timeZone: TZ, weekday: 'short' }).format(new Date());
+const SHIFT_DAYS = { Sat: 2, Sun: 1 }[realWeekday()] ?? 0;
+const TZ_OFFSET_MIN = 14 * 60; // Pacific/Kiritimati
+
 // Local time on the test phones.
 function localNow() {
   const parts = Object.fromEntries(new Intl.DateTimeFormat('en-GB', {
     timeZone: TZ, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', weekday: 'short', hourCycle: 'h23',
-  }).formatToParts(new Date()).map((x) => [x.type, x.value]));
+  }).formatToParts(new Date(Date.now() + SHIFT_MS)).map((x) => [x.type, x.value]));
   return { ymd: `${parts.year}${parts.month}${parts.day}`, minute: +parts.hour * 60 + +parts.minute, weekday: parts.weekday };
 }
-const fsValue = (v) => typeof v === 'number' ? { integerValue: String(v) } : v === null ? { nullValue: null } : { stringValue: v };
+const fsValue = (v) => typeof v === 'number' ? { integerValue: String(v) } : typeof v === 'boolean' ? { booleanValue: v } : v === null ? { nullValue: null } : { stringValue: v };
 
 (async () => {
   await fetch('http://127.0.0.1:9099/emulator/v1/projects/demo-supermom/accounts', { method: 'DELETE' });
   await fetch(`${FS}`.replace('/v1/', '/emulator/v1/'), { method: 'DELETE' });
-  const local = localNow();
-  if (['Sat', 'Sun'].includes(local.weekday)) {
-    console.log(`SKIPPED: it is ${local.weekday} in ${TZ}; school tasks only open on school days.`);
-    return;
-  }
   const b = await chromium.launch();
   try {
     const mom = await newPhone(b, 'MOM');
@@ -117,6 +120,22 @@ const fsValue = (v) => typeof v === 'number' ? { integerValue: String(v) } : v =
     await tap(mom, 'Done');
     await tap(mom, 'Back');
     await tap(mom, 'Back');
+
+    if (SHIFT_DAYS) {
+      step(`moving the test clock ${SHIFT_DAYS} day(s) forward to Monday`);
+      SHIFT_MS = SHIFT_DAYS * 86400000;
+      for (const pg of [mom, kid]) await pg.clock.setSystemTime(new Date(Date.now() + SHIFT_MS));
+      await mom.waitForTimeout(40000); // Mom's phone does its daily upkeep for the new day
+      const fams = await (await fetch(`${FS}/families`, { headers: owner })).json();
+      const fp = fams.documents[0].name;
+      const r = await fetch(`http://127.0.0.1:8080/v1/${fp}?updateMask.fieldPaths=tzOffsetMin`, {
+        method: 'PATCH', headers: owner,
+        body: JSON.stringify({ fields: { tzOffsetMin: { integerValue: String(TZ_OFFSET_MIN + SHIFT_DAYS * 1440) } } }),
+      });
+      if (!r.ok) throw new Error('could not shift the family time zone');
+      await mom.waitForTimeout(1500);
+    }
+    const local = localNow();
 
     step('mom adds a competition in the School tab');
     await tab(mom, 'School');
@@ -161,6 +180,7 @@ const fsValue = (v) => typeof v === 'number' ? { integerValue: String(v) } : v =
     console.log('KID SEES HOMEWORK:', /Homework \(Maths\): Worksheet p\.42/.test(kidText));
     console.log('KID SEES COMPETITION:', /Qur'an recitation/.test(kidText));
     console.log('KID SEES ENCOURAGEMENT:', /Come on, Aisha!/.test(kidText));
+    if (process.env.DEBUG) { const i = kidText.indexOf('Come on'); console.log('DEBUG', kidText.slice(i, i + 700)); }
     console.log('KID SEES TEACHER ANNOUNCEMENT:', /From your teacher/.test(kidText) && /science notebook/.test(kidText));
 
     step('aisha ticks the homework');

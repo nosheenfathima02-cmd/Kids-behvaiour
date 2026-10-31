@@ -362,4 +362,32 @@ void main() {
       expect(item.hasTask, isFalse);
     });
   });
+
+  test('one damaged school item does not stop the family from loading', () {
+    final doc = {
+      'parents': ['mom'],
+      'weekId': '20261026',
+      'schoolItems': {
+        's_ok': homework('s_ok', '20261027').toJson(),
+        's_bad': {
+          'id': 's_bad',
+          'kind': 'homework',
+        }, // missing kidId and dueYmd
+        's_text_bool': {
+          ...homework('s_text_bool', '20261027').toJson(),
+          'handedIn': 'false',
+        },
+      },
+    };
+    final family = FamilyData.fromDoc('f', doc, []);
+    expect(
+      family.schoolItems.map((i) => i.id),
+      containsAll(['s_ok', 's_text_bool']),
+    );
+    expect(family.schoolItems.any((i) => i.id == 's_bad'), isFalse);
+    expect(
+      family.schoolItems.firstWhere((i) => i.id == 's_text_bool').handedIn,
+      isFalse,
+    );
+  });
 }

@@ -36,6 +36,14 @@ extension CategoryLabel on TaskCategory {
 /// Who marked a task done.
 enum DoneBy { kid, mom }
 
+T? _tryParse<T>(T Function() parse) {
+  try {
+    return parse();
+  } catch (_) {
+    return null;
+  }
+}
+
 /// Firestore can hand back nested maps typed loosely, especially on the web.
 Map<String, dynamic> asMap(Object? o) => (o as Map).cast<String, dynamic>();
 
@@ -387,7 +395,7 @@ class SchoolItem {
     link: j['link'] as String?,
     practiceTarget: (j['practiceTarget'] as num?)?.toInt() ?? 0,
     practiceDone: (j['practiceDone'] as num?)?.toInt() ?? 0,
-    handedIn: j['handedIn'] as bool? ?? false,
+    handedIn: j['handedIn'] == true,
     details: j['details'] as String? ?? '',
   );
 }
@@ -481,8 +489,11 @@ class FamilyData {
         (v as List).map((e) => (e as num).toInt()).toList(),
       ),
     ),
-    schoolItems: ((j['schoolItems'] as Map?) ?? {}).values
-        .map((e) => SchoolItem.fromJson(asMap(e)))
-        .toList(),
+    // A single damaged item must never stop the rest of the family's data
+    // from loading, so items that cannot be read are skipped.
+    schoolItems: [
+      for (final e in ((j['schoolItems'] as Map?) ?? {}).values)
+        ?_tryParse(() => SchoolItem.fromJson(asMap(e))),
+    ],
   );
 }

@@ -22,6 +22,7 @@ async function newPhone(b, name) {
     }).observe(document, { childList: true, subtree: true });
   });
   const p = await ctx.newPage();
+  await p.clock.install();
   p.on('pageerror', e => console.log(name, 'ERR', e.message.slice(0, 300)));
   await p.goto('http://localhost:8765/');
   await p.waitForTimeout(3500);
@@ -30,7 +31,7 @@ async function newPhone(b, name) {
   return p;
 }
 const tap = async (p, name, opts = {}) => { console.log('  tap', String(name)); await p.getByRole('button', { name, ...opts }).first().click({ timeout: 8000, force: true }); await p.waitForTimeout(900); };
-const type = async (p, label, text) => { const f = p.locator(`input[aria-label="${label}"], textarea[aria-label="${label}"]`).or(p.getByRole('textbox', { name: label })).first(); await f.click({ force: true, timeout: 5000 }); await p.keyboard.type(text); await p.waitForTimeout(200); };
+const type = async (p, label, text) => { const f = p.locator(`input[aria-label="${label}"], textarea[aria-label="${label}"]`).or(p.getByRole('textbox', { name: label })).first(); await f.click({ force: true, timeout: 5000 }); await p.waitForTimeout(400); await p.keyboard.type(text, { delay: 30 }); await p.waitForTimeout(300); };
 const shot = (p, f) => p.screenshot({ path: `${__dirname}/screenshots/${f}` });
 
 (async () => {
@@ -77,6 +78,25 @@ const shot = (p, f) => p.screenshot({ path: `${__dirname}/screenshots/${f}` });
     await shot(kid, 'e5-kid.png');
     await shot(mom, 'e6-mom-linked.png');
 
+    // On a weekend no task is open (correct), so move both phones and the
+    // family's time zone forward to Monday. Done after linking: link codes
+    // are checked against the server's real clock.
+    const weekday = new Intl.DateTimeFormat('en-GB', { timeZone: 'Pacific/Kiritimati', weekday: 'short' }).format(new Date());
+    const shiftDays = { Sat: 2, Sun: 1 }[weekday] ?? 0;
+    if (shiftDays) {
+      step(`moving the test clock ${shiftDays} day(s) forward to Monday`);
+      for (const pg of [mom, kid]) await pg.clock.setSystemTime(new Date(Date.now() + shiftDays * 86400000));
+      await mom.waitForTimeout(40000); // Mom's phone does its daily upkeep for the new day
+      const FS = 'http://127.0.0.1:8080/v1/projects/demo-supermom/databases/(default)/documents';
+      const fams = await (await fetch(`${FS}/families`, { headers: { Authorization: 'Bearer owner' } })).json();
+      const r = await fetch(`http://127.0.0.1:8080/v1/${fams.documents[0].name}?updateMask.fieldPaths=tzOffsetMin`, {
+        method: 'PATCH', headers: { Authorization: 'Bearer owner', 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fields: { tzOffsetMin: { integerValue: String(14 * 60 + shiftDays * 1440) } } }),
+      });
+      if (!r.ok) throw new Error('could not shift the family time zone');
+      await kid.waitForTimeout(2000);
+    }
+
     step('aisha ticks an open task');
     await tap(kid, /^Mark done/);
     await kid.waitForTimeout(2500);
@@ -106,9 +126,33 @@ const shot = (p, f) => p.screenshot({ path: `${__dirname}/screenshots/${f}` });
     await tap(mom, 'Back'); // from the devices list to Settings
     await mom.mouse.move(210, 450);
     for (let i = 0; i < 12; i++) { await mom.mouse.wheel(0, 800); await mom.waitForTimeout(200); }
-    await tap(mom, 'Delete account and family data');
-    await tap(mom, 'Tap again to delete everything');
-    await mom.waitForTimeout(3000);
+    // Firebase only deletes a sign-in used in the last few minutes; older
+    // sign-ins get asked to sign in again. Back to the real clock first.
+    await mom.clock.setSystemTime(new Date());
+    const accountGone = async () => {
+      const users = await (await fetch('http://127.0.0.1:9099/identitytoolkit.googleapis.com/v1/projects/demo-supermom/accounts:query', {
+        method: 'POST', headers: { Authorization: 'Bearer owner', 'Content-Type': 'application/json' }, body: '{}',
+      })).json();
+      return !(users.userInfo || []).some((u) => u.email === 'mom@example.com');
+    };
+    const deleteFromSettings = async () => {
+      await tap(mom, 'Delete account and family data');
+      await tap(mom, 'Tap again to delete everything');
+      for (let i = 0; i < 20 && !(await accountGone()); i++) await mom.waitForTimeout(1000);
+    };
+    await deleteFromSettings();
+    if (!(await accountGone())) {
+      step('app asked to sign in again before deleting (safety rule); signing in');
+      await tap(mom, "I'm a parent");
+      await type(mom, 'Email', 'mom@example.com');
+      await type(mom, 'Password', 'bismillah123');
+      await tap(mom, 'Sign in', { exact: true });
+      await mom.waitForTimeout(3000);
+      await tap(mom, 'Settings');
+      await mom.mouse.move(210, 450);
+      for (let i = 0; i < 12; i++) { await mom.mouse.wheel(0, 800); await mom.waitForTimeout(200); }
+      await deleteFromSettings();
+    }
     await shot(mom, 'e10-deleted.png');
     const fs = await (await fetch('http://127.0.0.1:8080/v1/projects/demo-supermom/databases/(default)/documents/families', { headers: { Authorization: 'Bearer owner' } })).json();
     const users = await (await fetch('http://127.0.0.1:9099/identitytoolkit.googleapis.com/v1/projects/demo-supermom/accounts:query', {
