@@ -1,5 +1,6 @@
 # Builds an installable Android APK on GitHub's servers.
-# Download it from the repository's Actions tab → latest "Build Android APK" run → Artifacts.
+# Download it from the "Latest test build" release:
+# https://github.com/nosheenfathima02-cmd/Kids-behvaiour/releases/tag/test-build
 name: Build Android APK
 
 on:
@@ -7,6 +8,9 @@ on:
     branches: [main]
     paths: ['app/**', '.github/workflows/build-apk.yml']
   workflow_dispatch:
+
+permissions:
+  contents: write # to publish the APK as a release
 
 jobs:
   apk:
@@ -45,7 +49,21 @@ jobs:
           else
             echo "::notice::No app/assets/audio/adhan.mp3 yet, so prayer reminders use the normal notification sound."
           fi
-      - run: flutter build apk --release --dart-define=CLASSROOM=false $ADHAN_DEFINE
+      # Each build gets its own number, shown in the app (Settings and the welcome screen).
+      - run: >-
+          flutter build apk --release --dart-define=CLASSROOM=false $ADHAN_DEFINE
+          --build-number=${{ github.run_number }} --build-name=1.0.${{ github.run_number }}
+          --dart-define=BUILD=${{ github.run_number }}
+      - name: Publish as the "Latest test build" release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          APK="super-mom-build-${{ github.run_number }}.apk"
+          cp build/app/outputs/flutter-apk/app-release.apk "$APK"
+          gh release delete test-build --yes --cleanup-tag || true
+          gh release create test-build "$APK" --prerelease --target "${{ github.sha }}" \
+            --title "Latest test build (build ${{ github.run_number }})" \
+            --notes "Tap $APK below to download it on the Android phone, then open it to install. The app shows Version 1.0.${{ github.run_number }} in Settings and at the bottom of the first screen."
       - uses: actions/upload-artifact@v4
         with:
           name: super-mom-apk

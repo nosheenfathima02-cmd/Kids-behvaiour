@@ -809,6 +809,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   onPressed: () => setState(() => _confirmDelete = true),
                   child: const Text('Delete account and family data'),
                 ),
+          const SizedBox(height: 24),
+          Center(
+            child: Text(
+              appVersionLabel,
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          ),
         ],
       ),
     );

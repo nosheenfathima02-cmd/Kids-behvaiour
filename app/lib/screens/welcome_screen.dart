@@ -59,6 +59,12 @@ class WelcomeScreen extends StatelessWidget {
                     MaterialPageRoute(builder: (_) => const LinkDeviceScreen()),
                   ),
                 ),
+                const SizedBox(height: 24),
+                Text(
+                  appVersionLabel,
+                  textAlign: TextAlign.center,
+                  style: text.bodySmall,
+                ),
               ],
             ),
           ),

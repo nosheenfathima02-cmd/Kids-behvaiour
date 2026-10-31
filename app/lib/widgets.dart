@@ -15,6 +15,12 @@ class StoreScope extends InheritedNotifier<AppStore> {
 
 const starGold = Color(0xFFE0A50F);
 
+/// Set by the GitHub build (`--dart-define=BUILD=<run number>`).
+const buildNumber = String.fromEnvironment('BUILD');
+const appVersionLabel = buildNumber == ''
+    ? 'Development version'
+    : 'Version 1.0.$buildNumber';
+
 class StarRow extends StatelessWidget {
   const StarRow({super.key, required this.score, this.size = 20});
   final WeekScore score;
