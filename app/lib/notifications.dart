@@ -70,7 +70,7 @@ class Notifications {
     if (!await _init()) return;
     await _plugin.cancelAll();
     var reminderId = 100;
-    for (final r in reminders.take(20)) {
+    for (final r in reminders.take(40)) {
       await _plugin.zonedSchedule(
         id: reminderId++,
         scheduledDate: tz.TZDateTime.from(r.at, tz.local),

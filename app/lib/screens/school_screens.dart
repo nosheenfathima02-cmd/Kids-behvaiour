@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../classroom.dart';
+import '../content.dart';
 import '../logic.dart';
 import '../models.dart';
 import '../store.dart';
@@ -42,7 +43,46 @@ IconData schoolIcon(SchoolKind k) => switch (k) {
   SchoolKind.homework => Icons.edit_note,
   SchoolKind.test => Icons.quiz_outlined,
   SchoolKind.event => Icons.emoji_events_outlined,
+  SchoolKind.notice => Icons.campaign_outlined,
 };
+
+/// A teacher's announcement, in full.
+Future<void> showNotice(
+  BuildContext context,
+  SchoolItem n, {
+  VoidCallback? onDelete,
+}) => showDialog<void>(
+  context: context,
+  builder: (ctx) => AlertDialog(
+    icon: const Icon(Icons.campaign_outlined),
+    title: Text(n.subject.isEmpty ? 'From your teacher' : n.subject),
+    content: SingleChildScrollView(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(formatYmd(n.dueYmd), style: Theme.of(ctx).textTheme.bodySmall),
+          const SizedBox(height: 8),
+          SelectableText(n.details.isEmpty ? n.title : n.details),
+        ],
+      ),
+    ),
+    actions: [
+      if (onDelete != null)
+        TextButton(
+          onPressed: () {
+            onDelete();
+            Navigator.pop(ctx);
+          },
+          child: const Text('Remove'),
+        ),
+      FilledButton(
+        onPressed: () => Navigator.pop(ctx),
+        child: const Text('OK'),
+      ),
+    ],
+  ),
+);
 
 // ---------------- parent: School tab ----------------
 
@@ -63,7 +103,9 @@ class _SchoolTabState extends State<SchoolTab> {
     final msg = await store.syncClassroom(widget.kid);
     if (!mounted) return;
     setState(() => _syncing = false);
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+    if (msg != null) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+    }
   }
 
   void _edit(SchoolKind kind, [SchoolItem? item]) => Navigator.push(
@@ -169,7 +211,9 @@ class _SchoolTabState extends State<SchoolTab> {
                         'task on ${formatYmd(i.fromYmd!)}',
                       if (i.kind == SchoolKind.event && i.practiceTarget > 0)
                         'practice ${i.practiceDone + practiceTicksThisWeek(kid, i)} of ${i.practiceTarget}',
-                      if (i.source == 'classroom') 'from Classroom',
+                      if (i.handedIn) 'handed in ✓',
+                      if (i.source == 'classroom' && !i.handedIn)
+                        'from Classroom',
                     ].join(' · '),
                   ),
                   trailing: const Icon(Icons.chevron_right),
@@ -178,6 +222,32 @@ class _SchoolTabState extends State<SchoolTab> {
             ],
           ),
         ),
+        if (store.noticesFor(kid).isNotEmpty) ...[
+          const SizedBox(height: 12),
+          SectionCard(
+            title: 'Teacher announcements',
+            child: Column(
+              children: [
+                for (final n in store.noticesFor(kid))
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: const Icon(Icons.campaign_outlined),
+                    title: Text(
+                      n.title,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    subtitle: Text('${n.subject} · ${formatYmd(n.dueYmd)}'),
+                    onTap: () => showNotice(
+                      context,
+                      n,
+                      onDelete: () => store.deleteSchoolItem(n),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ],
       ],
     );
   }
@@ -498,14 +568,33 @@ class KidSchoolCard extends StatelessWidget {
               i.kind != SchoolKind.homework &&
               daysUntil(i.dueYmd, store.now) <= 14,
         );
-    if (items.isEmpty) return const SizedBox.shrink();
+    final left = store.schoolWorkLeftToday(kid);
+    final notices = store.noticesFor(kid);
+    if (items.isEmpty && left.isEmpty && notices.isEmpty) {
+      return const SizedBox.shrink();
+    }
     final cs = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.only(top: 12),
       child: SectionCard(
-        title: 'Coming up at school',
+        title: 'School',
         child: Column(
           children: [
+            if (left.isNotEmpty)
+              Container(
+                width: double.infinity,
+                margin: const EdgeInsets.only(bottom: 8),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: starGold.withValues(alpha: 0.18),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  '💪 Come on, ${kid.name}! ${left.length == 1 ? 'Your ${left.first.subject.isEmpty ? left.first.title : left.first.subject} homework is' : '${left.length} pieces of school work are'} '
+                  'waiting today. ${encouragementFor('${left.first.id}${store.todayWeekday}')}',
+                  style: const TextStyle(fontWeight: FontWeight.w700),
+                ),
+              ),
             for (final i in items)
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 6),
@@ -559,6 +648,29 @@ class KidSchoolCard extends StatelessWidget {
                   ],
                 ),
               ),
+            if (notices.isNotEmpty) ...[
+              const Divider(height: 20),
+              const Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  '📣 From your teacher',
+                  style: TextStyle(fontWeight: FontWeight.w700),
+                ),
+              ),
+              for (final n in notices.take(3))
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  dense: true,
+                  title: Text(
+                    n.title,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  subtitle: Text('${n.subject} · ${formatYmd(n.dueYmd)}'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => showNotice(context, n),
+                ),
+            ],
           ],
         ),
       ),

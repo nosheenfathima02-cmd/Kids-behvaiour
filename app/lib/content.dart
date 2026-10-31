@@ -194,3 +194,18 @@ IconData iconFor(TaskCategory c) => switch (c) {
   TaskCategory.sleep => Icons.bedtime_outlined,
   TaskCategory.fast => Icons.nightlight_outlined,
 };
+
+/// Short, kind encouragement for homework and test reminders.
+const encouragements = <String>[
+  'Come on, you can do it! Finish it first, then do your other work.',
+  'Bismillah! Start now and it will be done before you know it.',
+  'You are a star. One step at a time, you will finish it!',
+  'Allah loves those who do their work well. Give it your best!',
+  'Small steps every day make you strong. Let\'s finish it now!',
+  'Homework first, then play. You\'ve got this!',
+  'Say Bismillah, sit down and start. Mom is proud of you!',
+];
+
+/// The same item always gets the same line, so reminders don't jump around.
+String encouragementFor(String id) =>
+    encouragements[id.hashCode.abs() % encouragements.length];

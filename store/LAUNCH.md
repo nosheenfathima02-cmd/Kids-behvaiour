@@ -71,8 +71,8 @@ Both stores need a working sign-in. Create a parent account (email + password) i
 
 ## 7. Google Classroom verification (after launch) — together
 
-Classroom uses "sensitive" Google permissions, so Google must verify the app before the public can use it:
-- Google Cloud console → OAuth consent screen: app name, logo, support email, the privacy policy URL, and the two Classroom scopes.
+Classroom uses "sensitive" Google permissions (courses, the child's coursework and announcements, all read-only), so Google must verify the app before the public can use it:
+- Google Cloud console → OAuth consent screen: app name, logo, support email, the privacy policy URL, and the three Classroom scopes.
 - Verify the website domain in Google Search Console.
 - Record a short screen video of the Classroom import on a phone (Google asks for it).
 - When approved, release an update built without `--dart-define=CLASSROOM=false`.

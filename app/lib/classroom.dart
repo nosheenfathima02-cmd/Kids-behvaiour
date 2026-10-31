@@ -1,7 +1,8 @@
 // Reads a child's upcoming Google Classroom work with their school account.
 //
-// Read-only scopes: course names and the child's own coursework. Runs on the
-// parent's phone; nothing is stored except the resulting homework items.
+// Read-only scopes: course names, the child's own coursework and the
+// teachers' announcements. Runs on the parent's phone; nothing is stored
+// except the resulting homework, test and announcement items.
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
@@ -14,7 +15,11 @@ import 'models.dart';
 const classroomScopes = [
   'https://www.googleapis.com/auth/classroom.courses.readonly',
   'https://www.googleapis.com/auth/classroom.coursework.me.readonly',
+  'https://www.googleapis.com/auth/classroom.announcements.readonly',
 ];
+
+/// How many days of teacher announcements to show.
+const classroomNoticeDays = 7;
 
 /// Build with `--dart-define=CLASSROOM=false` to hide the Classroom import,
 /// e.g. for a store release before Google has verified the Classroom scopes.
@@ -129,10 +134,76 @@ SchoolItem schoolItemFor(
   );
 }
 
+class ClassroomNotice {
+  ClassroomNotice({
+    required this.courseId,
+    required this.id,
+    required this.courseName,
+    required this.text,
+    required this.posted,
+    this.link,
+  });
+  final String courseId;
+  final String id;
+  final String courseName;
+  final String text;
+  final DateTime posted;
+  final String? link;
+
+  String get itemId =>
+      's_an_${'${courseId}_$id'.replaceAll(RegExp(r'[^A-Za-z0-9_]'), '')}';
+}
+
+/// Teachers' announcements from the last [classroomNoticeDays] days.
+List<ClassroomNotice> parseAnnouncements(
+  Map<String, dynamic> json,
+  String courseName,
+  DateTime now,
+) {
+  final since = now.subtract(const Duration(days: classroomNoticeDays));
+  final out = <ClassroomNotice>[];
+  for (final a in (json['announcements'] as List?) ?? const []) {
+    final m = asMap(a);
+    final when = DateTime.tryParse(
+      (m['updateTime'] ?? m['creationTime'] ?? '') as String,
+    )?.toLocal();
+    final text = (m['text'] as String? ?? '').trim();
+    if (when == null || when.isBefore(since) || text.isEmpty) continue;
+    out.add(
+      ClassroomNotice(
+        courseId: m['courseId'] as String,
+        id: m['id'] as String,
+        courseName: courseName,
+        text: text.length > 600 ? '${text.substring(0, 600)}…' : text,
+        posted: when,
+        link: m['alternateLink'] as String?,
+      ),
+    );
+  }
+  return out;
+}
+
+/// The announcement as a school item: shown on the child's page, no task.
+SchoolItem schoolItemForNotice(ClassroomNotice n, String kidId) {
+  final firstLine = n.text.split('\n').first.trim();
+  return SchoolItem(
+    id: n.itemId,
+    kidId: kidId,
+    kind: SchoolKind.notice,
+    title: firstLine.length > 80 ? '${firstLine.substring(0, 80)}…' : firstLine,
+    subject: n.courseName,
+    dueYmd: ymdKey(n.posted),
+    source: 'classroom',
+    link: n.link,
+    details: n.text,
+  );
+}
+
 class ClassroomResult {
-  ClassroomResult(this.email, this.work);
+  ClassroomResult(this.email, this.work, this.notices);
   final String email;
   final List<ClassroomWork> work;
+  final List<ClassroomNotice> notices;
 }
 
 class ClassroomException implements Exception {
@@ -151,9 +222,15 @@ class ClassroomClient {
       (defaultTargetPlatform == TargetPlatform.android ||
           defaultTargetPlatform == TargetPlatform.iOS);
 
-  /// Asks the parent to pick the child's school account, then reads their
-  /// upcoming work.
-  static Future<ClassroomResult> fetch(DateTime now) async {
+  /// Reads the child's upcoming work and recent announcements. With
+  /// [interactive] the parent picks the child's school account; without it
+  /// (the daily background sync) it only works when that account is still
+  /// signed in and returns null otherwise, never showing a screen.
+  static Future<ClassroomResult?> fetch(
+    DateTime now, {
+    bool interactive = true,
+    String? expectedEmail,
+  }) async {
     if (!supported) {
       throw ClassroomException('Google Classroom works in the phone app.');
     }
@@ -163,6 +240,20 @@ class ClassroomClient {
       _initialised = true;
     }
     final GoogleSignInAccount account;
+    if (!interactive) {
+      final quiet = await signIn.attemptLightweightAuthentication(
+        reportAllExceptions: false,
+      );
+      if (quiet == null ||
+          (expectedEmail != null && quiet.email != expectedEmail)) {
+        return null;
+      }
+      final quietAuth = await quiet.authorizationClient.authorizationForScopes(
+        classroomScopes,
+      );
+      if (quietAuth == null) return null;
+      return _read(now, quiet.email, quietAuth.accessToken);
+    }
     try {
       // Always show the account picker: each child has their own school account.
       await signIn.signOut();
@@ -180,7 +271,15 @@ class ClassroomClient {
           classroomScopes,
         ) ??
         await account.authorizationClient.authorizeScopes(classroomScopes);
-    final headers = {'Authorization': 'Bearer ${auth.accessToken}'};
+    return _read(now, account.email, auth.accessToken);
+  }
+
+  static Future<ClassroomResult> _read(
+    DateTime now,
+    String email,
+    String token,
+  ) async {
+    final headers = {'Authorization': 'Bearer $token'};
 
     Future<Map<String, dynamic>> get(
       String path, [
@@ -208,9 +307,22 @@ class ClassroomClient {
       'pageSize': '30',
     });
     final work = <ClassroomWork>[];
+    final notices = <ClassroomNotice>[];
     for (final c in (courses['courses'] as List?) ?? const []) {
       final course = asMap(c);
       final id = course['id'] as String;
+      final announcements = await get('/v1/courses/$id/announcements', {
+        'announcementStates': 'PUBLISHED',
+        'orderBy': 'updateTime desc',
+        'pageSize': '10',
+      });
+      notices.addAll(
+        parseAnnouncements(
+          announcements,
+          course['name'] as String? ?? 'Class',
+          now,
+        ),
+      );
       final submissions = await get(
         '/v1/courses/$id/courseWork/-/studentSubmissions',
         {
@@ -238,6 +350,6 @@ class ClassroomClient {
         ),
       );
     }
-    return ClassroomResult(account.email, work);
+    return ClassroomResult(email, work, notices);
   }
 }

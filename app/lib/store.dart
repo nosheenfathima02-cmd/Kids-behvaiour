@@ -153,7 +153,12 @@ class AppStore extends ChangeNotifier {
   /// Upcoming homework, tests and competitions for one child, soonest first.
   List<SchoolItem> schoolItemsFor(Kid kid) =>
       family.schoolItems
-          .where((i) => i.kidId == kid.id && daysUntil(i.dueYmd, now) >= 0)
+          .where(
+            (i) =>
+                i.kidId == kid.id &&
+                i.kind != SchoolKind.notice &&
+                daysUntil(i.dueYmd, now) >= 0,
+          )
           .toList()
         ..sort((a, b) => a.dueYmd.compareTo(b.dueYmd));
 
@@ -666,6 +671,7 @@ class AppStore extends ChangeNotifier {
     }
     if (updates.isNotEmpty) _write(_familyRef.update(updates));
     if (family.weekId != currentWeekId) _rollWeek();
+    _dailyClassroomSync();
   }
 
   Map<String, List<int>> _windowsAhead(PrayerSettings p) {
@@ -849,32 +855,78 @@ class AppStore extends ChangeNotifier {
   /// Tests and competitions: a reminder the evening before, and on the
   /// morning of a competition.
   List<ScheduledReminder> _schoolReminders() {
-    final kids = visibleKids.map((k) => k.id).toSet();
     final out = <ScheduledReminder>[];
-    for (final i in family.schoolItems) {
-      if (!kids.contains(i.kidId) || i.kind == SchoolKind.homework) continue;
-      final day = dateFromYmd(i.dueYmd);
-      final name = kidById(i.kidId)?.name ?? '';
-      final what = i.kind == SchoolKind.test
-          ? '${i.subject.isEmpty ? '' : '${i.subject} '}test: ${i.title}'
-          : i.title;
-      out.add(
-        ScheduledReminder(
-          day.subtract(const Duration(hours: 6)),
-          'Tomorrow: $what',
-          'Bismillah, $name. Get ready tonight and sleep early.',
-        ),
-      );
-      if (i.kind == SchoolKind.event) {
-        out.add(
-          ScheduledReminder(
-            day.add(const Duration(hours: 7)),
-            'Today: ${i.title}',
-            'Good luck, $name! Say Bismillah and do your best.',
-          ),
-        );
+    for (final kid in visibleKids) {
+      for (final i in family.schoolItems.where((i) => i.kidId == kid.id)) {
+        final name = kid.name;
+        final cheer = encouragementFor(i.id);
+        switch (i.kind) {
+          case SchoolKind.homework:
+            // When homework time starts, an hour before it closes, and on
+            // the due day, until it is ticked or handed in on Classroom.
+            if (_schoolDone(kid, i) || i.fromYmd == null) break;
+            final work = dateFromYmd(i.fromYmd!);
+            final what = i.subject.isEmpty
+                ? i.title
+                : '${i.subject}: ${i.title}';
+            out.add(
+              ScheduledReminder(
+                work.add(Duration(minutes: i.startMin)),
+                '📚 Homework time, $name!',
+                '$what. $cheer',
+              ),
+            );
+            if (i.endMin - i.startMin > 90) {
+              out.add(
+                ScheduledReminder(
+                  work.add(Duration(minutes: i.endMin - 60)),
+                  '⏰ Don\'t forget, $name: $what',
+                  'Only one hour left. You\'re almost there, finish it now!',
+                ),
+              );
+            }
+            final due = dateFromYmd(i.dueYmd);
+            if (due.isAfter(work)) {
+              out.add(
+                ScheduledReminder(
+                  due.add(const Duration(hours: 7)),
+                  '🎒 Hand it in today: $what',
+                  'Put it in your school bag, $name. Well done for finishing it!',
+                ),
+              );
+            }
+          case SchoolKind.test:
+            final what =
+                '${i.subject.isEmpty ? '' : '${i.subject} '}test: ${i.title}';
+            out.add(
+              ScheduledReminder(
+                dateFromYmd(i.dueYmd).subtract(const Duration(hours: 6)),
+                '📝 Tomorrow: $what',
+                'Revise a little, then sleep early, $name. $cheer',
+              ),
+            );
+          case SchoolKind.event:
+            final day = dateFromYmd(i.dueYmd);
+            out.add(
+              ScheduledReminder(
+                day.subtract(const Duration(hours: 6)),
+                '🏆 Tomorrow: ${i.title}',
+                'Bismillah, $name. Get ready tonight and sleep early.',
+              ),
+            );
+            out.add(
+              ScheduledReminder(
+                day.add(const Duration(hours: 7)),
+                'Today: ${i.title}',
+                'Good luck, $name! Say Bismillah and do your best.',
+              ),
+            );
+          case SchoolKind.notice:
+            break;
+        }
       }
     }
+    out.sort((a, b) => a.at.compareTo(b.at));
     return out.where((r) => r.at.isAfter(now)).toList();
   }
 
@@ -901,54 +953,91 @@ class AppStore extends ChangeNotifier {
 
   String newSchoolItemId() => 's_${_newId()}';
 
-  /// Imports a child's upcoming Google Classroom work as homework and tests.
-  /// Returns a message for the parent.
-  Future<String> syncClassroom(Kid kid) async {
+  /// Imports a child's upcoming Google Classroom homework and tests, and
+  /// their teachers' recent announcements. Returns a message for the parent,
+  /// or null when a background sync could not run without asking.
+  Future<String?> syncClassroom(Kid kid, {bool interactive = true}) async {
     try {
-      final result = await ClassroomClient.fetch(now);
+      final result = await ClassroomClient.fetch(
+        now,
+        interactive: interactive,
+        expectedEmail: interactive ? null : kid.classroomEmail,
+      );
+      if (result == null) return null;
       final updates = <Object, Object?>{};
-      final ticks = <String, String>{};
       var added = 0;
       for (final w in result.work) {
         final existing = family.schoolItems
             .where((x) => x.id == w.itemId)
             .firstOrNull;
         if (existing == null) added++;
-        final item = schoolItemFor(w, kid.id, now, existing: existing);
+        final item = schoolItemFor(w, kid.id, now, existing: existing)
+          ..handedIn = w.handedIn;
         updates[FieldPath(['schoolItems', item.id])] = item.toJson();
-        // Handed in on Classroom: tick the homework task, so it counts
-        // towards this week's stars like any other task.
-        final day = item.fromYmd == null ? null : dateFromYmd(item.fromYmd!);
-        if (w.handedIn &&
-            day != null &&
-            weekIdFor(day) == currentWeekId &&
-            day.weekday <= 5) {
-          final key = Kid.key(day.weekday, item.id);
-          if (!kid.checks.containsKey(key)) ticks[key] = DoneBy.mom.name;
-        }
+      }
+      for (final n in result.notices) {
+        if (!family.schoolItems.any((x) => x.id == n.itemId)) added++;
+        final item = schoolItemForNotice(n, kid.id);
+        updates[FieldPath(['schoolItems', item.id])] = item.toJson();
       }
       if (updates.isNotEmpty) await _familyRef.update(updates);
-      if (ticks.isNotEmpty) {
-        await _weekRef(kid.id).set({
-          'kidId': kid.id,
-          'weekId': currentWeekId,
-          'checks': ticks,
-        }, SetOptions(merge: true));
+      if (kid.classroomEmail != result.email) {
+        kid.classroomEmail = result.email;
+        saveKid(kid);
       }
-      kid.classroomEmail = result.email;
-      saveKid(kid);
-      if (result.work.isEmpty) {
-        return 'No Classroom work due in the next 2 weeks for ${result.email}.';
-      }
-      final ticked = ticks.isEmpty
-          ? ''
-          : ' ${ticks.length} handed in, ticked for ${kid.name}.';
-      return '${result.work.length} item${result.work.length == 1 ? '' : 's'} from Classroom ($added new).$ticked';
+      final count = result.work.length + result.notices.length;
+      if (count == 0) return 'Nothing new on Classroom for ${result.email}.';
+      return '${result.work.length} homework and tests, ${result.notices.length} announcements from Classroom ($added new).';
     } on ClassroomException catch (e) {
-      return e.message;
+      return interactive ? e.message : null;
     } catch (e) {
-      return 'Classroom sync did not work: $e';
+      return interactive ? 'Classroom sync did not work: $e' : null;
     }
+  }
+
+  /// Once a day on the parent's phone: refresh Classroom for children whose
+  /// school account is still signed in, without showing anything.
+  Future<void> _dailyClassroomSync() async {
+    if (!classroomEnabled || !ClassroomClient.supported) return;
+    for (final kid in family.kids.where((k) => k.classroomEmail != null)) {
+      await syncClassroom(kid, interactive: false);
+    }
+  }
+
+  /// Teachers' announcements from the last week, newest first.
+  List<SchoolItem> noticesFor(Kid kid) =>
+      family.schoolItems
+          .where(
+            (i) =>
+                i.kidId == kid.id &&
+                i.kind == SchoolKind.notice &&
+                daysUntil(i.dueYmd, now) >= -classroomNoticeDays,
+          )
+          .toList()
+        ..sort((a, b) => b.dueYmd.compareTo(a.dueYmd));
+
+  /// Homework or revision still to do today (not ticked, not handed in).
+  List<SchoolItem> schoolWorkLeftToday(Kid kid) {
+    final today = ymdKey(now);
+    return family.schoolItems
+        .where(
+          (i) =>
+              i.kidId == kid.id &&
+              (i.kind == SchoolKind.homework || i.kind == SchoolKind.test) &&
+              i.fromYmd != null &&
+              i.fromYmd!.compareTo(today) <= 0 &&
+              (i.toYmd ?? i.fromYmd!).compareTo(today) >= 0 &&
+              !_schoolDone(kid, i),
+        )
+        .toList();
+  }
+
+  bool _schoolDone(Kid kid, SchoolItem i) {
+    if (i.handedIn) return true;
+    if (i.fromYmd == null) return false;
+    final day = dateFromYmd(i.fromYmd!);
+    return weekIdFor(day) == currentWeekId &&
+        kid.checks.containsKey(Kid.key(day.weekday, i.id));
   }
 
   void deleteTask(RoutineTask t) {

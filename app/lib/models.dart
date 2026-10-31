@@ -282,7 +282,9 @@ class PrayerSettings {
 }
 
 /// Result of a finished week, kept so Mom can look back.
-enum SchoolKind { homework, test, event }
+/// `notice` is a teacher's announcement from Google Classroom: shown to the
+/// child, never a task.
+enum SchoolKind { homework, test, event, notice }
 
 /// Homework, a test, or a competition. Homework and tests become a study
 /// task on their work day; a competition can add a daily practice task
@@ -303,6 +305,8 @@ class SchoolItem {
     this.link,
     this.practiceTarget = 0,
     this.practiceDone = 0,
+    this.handedIn = false,
+    this.details = '',
   });
 
   /// Starts with "s_" so it never clashes with a routine task id.
@@ -330,6 +334,12 @@ class SchoolItem {
   int practiceTarget;
   int practiceDone;
 
+  /// Turned in on Google Classroom: no more reminders.
+  bool handedIn;
+
+  /// The announcement text for a notice.
+  String details;
+
   bool get hasTask => fromYmd != null && toYmd != null;
 
   String get taskTitle => switch (kind) {
@@ -340,6 +350,7 @@ class SchoolItem {
           ? 'Revise for test: $title'
           : 'Revise for $subject test: $title',
     SchoolKind.event => 'Practise for $title',
+    SchoolKind.notice => title,
   };
 
   Map<String, dynamic> toJson() => {
@@ -357,6 +368,8 @@ class SchoolItem {
     'link': link,
     'practiceTarget': practiceTarget,
     'practiceDone': practiceDone,
+    'handedIn': handedIn,
+    'details': details,
   };
 
   factory SchoolItem.fromJson(Map<String, dynamic> j) => SchoolItem(
@@ -374,6 +387,8 @@ class SchoolItem {
     link: j['link'] as String?,
     practiceTarget: (j['practiceTarget'] as num?)?.toInt() ?? 0,
     practiceDone: (j['practiceDone'] as num?)?.toInt() ?? 0,
+    handedIn: j['handedIn'] as bool? ?? false,
+    details: j['details'] as String? ?? '',
   );
 }
 

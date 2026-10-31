@@ -46,7 +46,7 @@
     <tr><td>Children's first names, ages and chosen colour theme</td><td>To show each child their own page</td></tr>
     <tr><td>The weekly routine, this week's ticks, time-outs (with the reason the parent picked), stars, reward list and the reward a child picked</td><td>The core of the app: tracking the week and rewarding good habits</td></tr>
     <tr><td>Qur'an memorisation goal (surah and number of ayat)</td><td>To show progress</td></tr>
-    <tr><td>Homework, tests and competitions: title, subject, dates and, for Google Classroom items, the link to the classwork</td><td>To turn school work into tasks and reminders</td></tr>
+    <tr><td>Homework, tests and competitions: title, subject, dates and, for Google Classroom items, the link to the classwork and the text of teachers' recent announcements</td><td>To turn school work into tasks and reminders</td></tr>
     <tr><td>The child's school Google account email, if the parent imports from Google Classroom</td><td>To show which account was used</td></tr>
     <tr><td>The city chosen for prayer times and the family's time zone</td><td>To calculate prayer times and lock tasks at the right time. We never use GPS or track location.</td></tr>
     <tr><td>Linked devices: a random device ID and the name the parent gave it (e.g. "Aisha's tablet")</td><td>So a child's device can show only that child and can be removed by the parent</td></tr>
@@ -69,7 +69,7 @@
 <p>Parents can review and change everything about their children in the app, and can delete it at any time (see "Deleting your data"). We follow the U.S. Children's Online Privacy Protection Act (COPPA), the EU and UK GDPR, and the Google Play Families and Apple App Store rules for apps used by children.</p>
 
 <h2>Google Classroom</h2>
-<p>If a parent chooses to import homework from Google Classroom, they sign in with the child's school Google account on the parent's phone. Super Mom asks Google for <strong>read-only</strong> access to the list of classes and the child's own classwork (<code>classroom.courses.readonly</code> and <code>classroom.coursework.me.readonly</code>). It reads class names, classwork titles, due dates, links and whether work has been handed in, and stores only the title, class name, due date and link of work due in the next two weeks. The Google access token stays on the phone for that one import and is not stored by Super Mom. Super Mom never changes anything in Google Classroom.</p>
+<p>If a parent chooses to import homework from Google Classroom, they sign in with the child's school Google account on the parent's phone. Super Mom asks Google for <strong>read-only</strong> access to the list of classes and the child's own classwork (<code>classroom.courses.readonly</code>, <code>classroom.coursework.me.readonly</code> and <code>classroom.announcements.readonly</code>). It reads class names, classwork titles, due dates, links, whether work has been handed in, and the teachers' announcements, and stores only the title, class name, due date and link of work due in the next two weeks, and the text of announcements from the last week. It uses them to remind the child to finish homework and get ready for tests. The Google access token stays on the phone for that one import and is not stored by Super Mom. Super Mom never changes anything in Google Classroom.</p>
 <p>Super Mom's use and transfer of information received from Google APIs will adhere to the <a href="https://developers.google.com/terms/api-services-user-data-policy">Google API Services User Data Policy</a>, including the Limited Use requirements. Classroom information is used only to show homework, tests and reminders in the family's app; it is not used for advertising, not sold, and not shared with anyone else.</p>
 
 <h2>Qur'an recitation</h2>
@@ -82,7 +82,7 @@
 <h2>How long we keep it</h2>
 <ul>
   <li>Ticks and time-outs are deleted automatically at the start of each new week; only a one-line weekly summary is kept, for 12 weeks.</li>
-  <li>Homework, tests and competitions are deleted a week after their date.</li>
+  <li>Homework, tests, competitions and teachers' announcements are deleted a week after their date.</li>
   <li>Everything else is kept until the parent changes it or deletes the account.</li>
 </ul>
 

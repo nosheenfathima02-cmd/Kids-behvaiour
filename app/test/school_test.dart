@@ -224,4 +224,63 @@ void main() {
       expect(again.fromYmd, '20261026');
     });
   });
+
+  group('teacher announcements', () {
+    final now = DateTime(2026, 10, 28, 16);
+    final json = {
+      'announcements': [
+        {
+          'courseId': '111',
+          'id': 'a1',
+          'text': 'Bring your science notebook tomorrow.\nWe will start the plants project.',
+          'updateTime': '2026-10-27T08:15:00Z',
+          'alternateLink': 'https://classroom.google.com/c/111/p/a1',
+        },
+        {
+          'courseId': '111',
+          'id': 'a2',
+          'text': 'Old news',
+          'updateTime': '2026-10-01T08:00:00Z',
+        },
+        {
+          'courseId': '111',
+          'id': 'a3',
+          'text': '   ',
+          'updateTime': '2026-10-27T08:00:00Z',
+        },
+      ],
+    };
+
+    test('keeps announcements from the last week that have text', () {
+      final notices = parseAnnouncements(json, 'Science 5B', now);
+      expect(notices.map((n) => n.id), ['a1']);
+      expect(notices.first.courseName, 'Science 5B');
+    });
+
+    test('become a notice item with the first line as its title', () {
+      final item = schoolItemForNotice(
+        parseAnnouncements(json, 'Science 5B', now).first,
+        'kid1',
+      );
+      expect(item.kind, SchoolKind.notice);
+      expect(item.id, 's_an_111_a1');
+      expect(item.title, 'Bring your science notebook tomorrow.');
+      expect(item.details, contains('plants project'));
+      expect(item.hasTask, isFalse);
+      expect(SchoolItem.fromJson(item.toJson()).details, item.details);
+    });
+
+    test('announcements never become tasks', () {
+      final item = schoolItemForNotice(
+        parseAnnouncements(json, 'Science 5B', now).first,
+        'kid1',
+      );
+      expect(schoolTasks([item], '20261026'), isEmpty);
+    });
+  });
+
+  test('each item always gets the same encouragement', () {
+    expect(encouragementFor('s_cw_111_cw1'), encouragementFor('s_cw_111_cw1'));
+    expect(encouragements, contains(encouragementFor('anything')));
+  });
 }
