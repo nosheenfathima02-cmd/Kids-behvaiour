@@ -22,4 +22,10 @@ jobs:
           channel: stable
           cache: true
       - run: flutter pub get
-      - run: flutter build ios --release --no-codesign --dart-define=CLASSROOM=false
+      - name: Build (errors are also shown as annotations)
+        run: |
+          set -o pipefail
+          flutter build ios --release --no-codesign --dart-define=CLASSROOM=false 2>&1 | tee build.log || {
+            grep -iE "error|exception|requires|minimum|could not|failed" build.log | grep -v "^\s*$" | tail -40 | while IFS= read -r line; do echo "::error::${line:0:400}"; done
+            exit 1
+          }
