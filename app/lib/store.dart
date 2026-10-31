@@ -986,6 +986,13 @@ class AppStore extends ChangeNotifier {
         if (!family.schoolItems.any((x) => x.id == n.itemId)) added++;
         final item = schoolItemForNotice(n, kid.id);
         updates[FieldPath(['schoolItems', item.id])] = item.toJson();
+        // A test or date in the announcement becomes its own reminder; Mom's
+        // later changes to it are kept.
+        final dated = datedItemFromNotice(n, kid.id, now);
+        if (dated != null && !family.schoolItems.any((x) => x.id == dated.id)) {
+          updates[FieldPath(['schoolItems', dated.id])] = dated.toJson();
+          added++;
+        }
       }
       if (updates.isNotEmpty) await _familyRef.update(updates);
       if (kid.classroomEmail != result.email) {

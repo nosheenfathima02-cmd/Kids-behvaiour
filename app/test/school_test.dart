@@ -283,4 +283,83 @@ void main() {
     expect(encouragementFor('s_cw_111_cw1'), encouragementFor('s_cw_111_cw1'));
     expect(encouragements, contains(encouragementFor('anything')));
   });
+
+  group('real announcement from Grade 3', () {
+    // Posted on Saturday 31 October 2026 by the class teacher.
+    final now = DateTime(2026, 10, 31, 16, 30);
+    final notice = ClassroomNotice(
+      courseId: 'g3',
+      id: 'retest',
+      courseName: 'Grade 3',
+      posted: DateTime(2026, 10, 30, 9),
+      text:
+          'Asslamualaikum Warahmatullahe Wabarakatohu,\n\n'
+          'Many students in grade-3 have retest in Maths on Monday 02 November,2026.All the questions discussed in the class.\n'
+          'Let your child practice on weekend and perform well in the test In Sha Allah.',
+    );
+
+    test('the notification shows the news, not the greeting', () {
+      final item = schoolItemForNotice(notice, 'aisha');
+      expect(
+        item.title,
+        startsWith('Many students in grade-3 have retest in Maths'),
+      );
+    });
+
+    test(
+      'the retest becomes a test on Monday 2 November with revision on Friday',
+      () {
+        final test = datedItemFromNotice(notice, 'aisha', now)!;
+        expect(test.kind, SchoolKind.test);
+        expect(test.dueYmd, '20261102');
+        expect(test.subject, 'Grade 3');
+        expect(test.title, contains('retest in Maths'));
+        // Friday 30 Oct is already past on Saturday 31 Oct, so revise today.
+        expect(test.fromYmd, '20261031');
+      },
+    );
+
+    test('a weekday post gives revision the school day before', () {
+      final test = datedItemFromNotice(
+        notice,
+        'aisha',
+        DateTime(2026, 10, 28, 9),
+      )!;
+      expect(test.fromYmd, '20261030');
+    });
+  });
+
+  group('finding dates in announcements', () {
+    final now = DateTime(2026, 10, 28);
+    test('common ways teachers write dates', () {
+      expect(
+        ymdKey(findDateIn('Science quiz on 5th November', now)!),
+        '20261105',
+      );
+      expect(
+        ymdKey(findDateIn('Trip on November 12, 2026 to the zoo', now)!),
+        '20261112',
+      );
+      expect(ymdKey(findDateIn('Exam: 03/11/2026', now)!), '20261103');
+      expect(ymdKey(findDateIn('Sports day 2 Dec', now)!), '20261202');
+    });
+    test('past or far-away dates are ignored', () {
+      expect(findDateIn('Thank you for coming on 1 October', now), isNull);
+      expect(findDateIn('See you on 1 March 2027', now), isNull);
+      expect(findDateIn('No date here', now), isNull);
+    });
+    test('an announcement without a test is a reminder for that day', () {
+      final n = ClassroomNotice(
+        courseId: 'c',
+        id: 'x',
+        courseName: 'Grade 3',
+        posted: now,
+        text: 'Field trip to the science museum on 6 November. Bring a packed lunch.',
+      );
+      final item = datedItemFromNotice(n, 'aisha', now)!;
+      expect(item.kind, SchoolKind.event);
+      expect(item.dueYmd, '20261106');
+      expect(item.hasTask, isFalse);
+    });
+  });
 }

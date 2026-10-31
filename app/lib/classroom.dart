@@ -185,17 +185,167 @@ List<ClassroomNotice> parseAnnouncements(
 
 /// The announcement as a school item: shown on the child's page, no task.
 SchoolItem schoolItemForNotice(ClassroomNotice n, String kidId) {
-  final firstLine = n.text.split('\n').first.trim();
+  final headline = noticeHeadline(n.text);
   return SchoolItem(
     id: n.itemId,
     kidId: kidId,
     kind: SchoolKind.notice,
-    title: firstLine.length > 80 ? '${firstLine.substring(0, 80)}…' : firstLine,
+    title: headline.length > 80 ? '${headline.substring(0, 80)}…' : headline,
     subject: n.courseName,
     dueYmd: ymdKey(n.posted),
     source: 'classroom',
     link: n.link,
     details: n.text,
+  );
+}
+
+final _greeting = RegExp(
+  r"^(as+[s-]?alam|as+alamu|asslamu|salam|assalam|bismillah|dear\b|hello\b|hi\b|good (morning|afternoon|evening)|respected)",
+  caseSensitive: false,
+);
+
+/// The first line with real news, skipping greetings such as
+/// "Assalamu alaikum wa rahmatullah".
+String noticeHeadline(String text) {
+  final lines = text
+      .split('\n')
+      .map((l) => l.trim())
+      .where((l) => l.isNotEmpty)
+      .toList();
+  return lines.firstWhere(
+    (l) => !_greeting.hasMatch(l),
+    orElse: () => lines.isEmpty ? '' : lines.first,
+  );
+}
+
+const _months = {
+  'jan': 1,
+  'feb': 2,
+  'mar': 3,
+  'apr': 4,
+  'may': 5,
+  'jun': 6,
+  'jul': 7,
+  'aug': 8,
+  'sep': 9,
+  'oct': 10,
+  'nov': 11,
+  'dec': 12,
+};
+const _monthWord =
+    r'(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)';
+final _dayMonth = RegExp(
+  '\\b(\\d{1,2})(?:st|nd|rd|th)?\\s*(?:of\\s+)?$_monthWord\\b[,\\s]*(\\d{4})?',
+  caseSensitive: false,
+);
+final _monthDay = RegExp(
+  '\\b$_monthWord\\s+(\\d{1,2})(?:st|nd|rd|th)?\\b(?:[,\\s]+(\\d{4}))?',
+  caseSensitive: false,
+);
+final _numeric = RegExp(r'\b(\d{1,2})[/.-](\d{1,2})[/.-](\d{4})\b');
+final _testWord = RegExp(
+  r'\b(re-?tests?|tests?|exams?|quiz(?:zes)?|assessments?|examination)\b',
+  caseSensitive: false,
+);
+
+/// The first date in an announcement that is today or within the next 60
+/// days. Numeric dates are read day first (02/11/2026 = 2 November).
+DateTime? findDateIn(String text, DateTime now) {
+  final today = DateTime(now.year, now.month, now.day);
+  DateTime? make(int y, int m, int d) {
+    if (m < 1 || m > 12 || d < 1 || d > 31) return null;
+    final date = DateTime(y, m, d);
+    return date.month == m ? date : null;
+  }
+
+  final candidates = <(int, DateTime?)>[];
+  for (final m in _dayMonth.allMatches(text)) {
+    final month = _months[m.group(2)!.substring(0, 3).toLowerCase()]!;
+    final day = int.parse(m.group(1)!);
+    final year = m.group(3) == null ? null : int.parse(m.group(3)!);
+    candidates.add((
+      m.start,
+      year != null
+          ? make(year, month, day)
+          : _nextOccurrence(today, month, day),
+    ));
+  }
+  for (final m in _monthDay.allMatches(text)) {
+    final month = _months[m.group(1)!.substring(0, 3).toLowerCase()]!;
+    final day = int.parse(m.group(2)!);
+    final year = m.group(3) == null ? null : int.parse(m.group(3)!);
+    candidates.add((
+      m.start,
+      year != null
+          ? make(year, month, day)
+          : _nextOccurrence(today, month, day),
+    ));
+  }
+  for (final m in _numeric.allMatches(text)) {
+    candidates.add((
+      m.start,
+      make(
+        int.parse(m.group(3)!),
+        int.parse(m.group(2)!),
+        int.parse(m.group(1)!),
+      ),
+    ));
+  }
+  candidates.sort((a, b) => a.$1.compareTo(b.$1));
+  for (final (_, date) in candidates) {
+    if (date != null &&
+        !date.isBefore(today) &&
+        date.difference(today).inDays <= 60) {
+      return date;
+    }
+  }
+  return null;
+}
+
+DateTime? _nextOccurrence(DateTime today, int month, int day) {
+  for (final y in [today.year, today.year + 1]) {
+    final d = DateTime(y, month, day);
+    if (d.month == month && !d.isBefore(today)) return d;
+  }
+  return null;
+}
+
+/// An announcement that names a test and a date ("retest in Maths on Monday
+/// 02 November, 2026") becomes a test with a revision task the school day
+/// before. Other dated announcements become a reminder for that day.
+SchoolItem? datedItemFromNotice(ClassroomNotice n, String kidId, DateTime now) {
+  final date = findDateIn(n.text, now);
+  if (date == null) return null;
+  final sentences =
+      [
+            for (final line in n.text.split('\n'))
+              ...line.split(RegExp(r'(?<=[.!?])\s*(?=[A-Z])')),
+          ]
+          .map((x) => x.trim())
+          .where((x) => x.isNotEmpty && !_greeting.hasMatch(x))
+          .toList();
+  final isTest = _testWord.hasMatch(n.text);
+  bool hasDate(String x) => findDateIn(x, now) != null;
+  var sentence = sentences.firstWhere(
+    (x) => isTest ? _testWord.hasMatch(x) && hasDate(x) : hasDate(x),
+    orElse: () => sentences.firstWhere(
+      (x) => isTest && _testWord.hasMatch(x),
+      orElse: () => noticeHeadline(n.text),
+    ),
+  );
+  if (sentence.length > 90) sentence = '${sentence.substring(0, 90)}…';
+  final work = ymdKey(defaultWorkDay(date, now));
+  return SchoolItem(
+    id: '${n.itemId}_d',
+    kidId: kidId,
+    kind: isTest ? SchoolKind.test : SchoolKind.event,
+    title: sentence,
+    subject: n.courseName,
+    dueYmd: ymdKey(date),
+    fromYmd: isTest ? work : null,
+    toYmd: isTest ? work : null,
+    source: 'classroom',
+    link: n.link,
   );
 }
 
