@@ -77,6 +77,7 @@ flutter:
   # the APK build also copies it into the Android notification sounds.
   assets:
     - assets/audio/
+    - assets/images/
 
   # To add assets to your application, add an assets section, like this:
   # assets:
@@ -115,9 +116,9 @@ flutter_launcher_icons:
   ios: true
   image_path: assets/icon/icon.png
   remove_alpha_ios: true
-  adaptive_icon_background: "#0D6B5B"
+  adaptive_icon_background: assets/icon/icon.png
   adaptive_icon_foreground: assets/icon/icon_foreground.png
   web:
     generate: true
-    background_color: "#0D6B5B"
-    theme_color: "#0D6B5B"
+    background_color: "#F6EEFB"
+    theme_color: "#5E2B8C"

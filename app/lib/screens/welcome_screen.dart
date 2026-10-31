@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
+import '../main.dart';
 import '../store.dart';
 import '../widgets.dart';
 
@@ -22,15 +23,16 @@ class WelcomeScreen extends StatelessWidget {
               shrinkWrap: true,
               padding: const EdgeInsets.all(24),
               children: [
-                const Icon(Icons.star_rounded, size: 64, color: starGold),
-                Text(
-                  'Super Mom',
-                  style: text.headlineLarge?.copyWith(
-                    fontWeight: FontWeight.w700,
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(24),
+                  // The artwork already carries the "Super Mom" title.
+                  child: Image.asset(
+                    'assets/images/welcome.jpg',
+                    fit: BoxFit.fitWidth,
+                    semanticLabel: 'Super Mom: a mother hugging her daughter',
                   ),
-                  textAlign: TextAlign.center,
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 16),
                 Text(
                   'Assalamu alaikum! Who is using this phone?',
                   style: text.bodyLarge,
@@ -458,5 +460,33 @@ class UnlinkedScreen extends StatelessWidget {
         ),
       ),
     ),
+  );
+}
+
+/// "Super Mom" in the app's purple and pink.
+class SuperMomTitle extends StatelessWidget {
+  const SuperMomTitle({super.key, this.size = 36});
+  final double size;
+
+  @override
+  Widget build(BuildContext context) => Text.rich(
+    TextSpan(
+      style: TextStyle(fontSize: size, fontWeight: FontWeight.w800),
+      children: [
+        TextSpan(
+          text: 'Super ',
+          style: TextStyle(
+            color: Theme.of(context).brightness == Brightness.dark
+                ? const Color(0xFFCDB4EA)
+                : brandColor,
+          ),
+        ),
+        const TextSpan(
+          text: 'Mom',
+          style: TextStyle(color: brandPink),
+        ),
+      ],
+    ),
+    textAlign: TextAlign.center,
   );
 }

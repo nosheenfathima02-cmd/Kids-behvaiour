@@ -10,7 +10,9 @@ import 'screens/welcome_screen.dart';
 import 'store.dart';
 import 'widgets.dart';
 
-const brandColor = Color(0xFF0D6B5B);
+// Super Mom colours (from the app's artwork): deep purple, pink and gold.
+const brandColor = Color(0xFF5E2B8C);
+const brandPink = Color(0xFFE2457E);
 
 /// `--dart-define=USE_EMULATOR=true` talks to the local Firebase emulator
 /// instead of the real project. Use EMULATOR_HOST=10.0.2.2 for an Android emulator.
@@ -32,7 +34,13 @@ Future<void> main() async {
 }
 
 ThemeData buildTheme(Color seed, Brightness brightness) => ThemeData(
-  colorScheme: ColorScheme.fromSeed(seedColor: seed, brightness: brightness),
+  colorScheme: ColorScheme.fromSeed(
+    seedColor: seed,
+    brightness: brightness,
+    secondary: seed == brandColor && brightness == Brightness.light
+        ? brandPink
+        : null,
+  ),
   useMaterial3: true,
   cardTheme: const CardThemeData(elevation: 0),
 );

@@ -177,6 +177,9 @@ class Kid {
   /// The school Google account last used to import from Google Classroom.
   String? classroomEmail;
 
+  /// Names of the Classroom classes found with that account.
+  List<String> classroomClasses = [];
+
   List<Reward> rewards;
   int? wishIndex;
 
@@ -203,6 +206,7 @@ class Kid {
     ayahTotal = o.ayahTotal;
     rewards = o.rewards;
     classroomEmail = o.classroomEmail;
+    classroomClasses = o.classroomClasses;
   }
 
   /// The fields that stay from week to week (families/{fid}/kids/{id}).
@@ -229,34 +233,41 @@ class Kid {
     'ayahDone': ayahDone,
     'ayahTotal': ayahTotal,
     'classroomEmail': classroomEmail,
+    'classroomClasses': classroomClasses,
     'rewards': rewards.map((r) => r.toJson()).toList(),
     'wishIndex': wishIndex,
     'checks': checks.map((k, v) => MapEntry(k, v.name)),
     'timeouts': timeouts.map((t) => t.toJson()).toList(),
   };
 
-  factory Kid.fromJson(Map<String, dynamic> j) => Kid(
-    id: j['id'] as String,
-    name: j['name'] as String,
-    age: j['age'] as int,
-    theme: j['theme'] as String? ?? 'ocean',
-    examMode: j['examMode'] as bool? ?? false,
-    surahName: j['surahName'] as String? ?? '',
-    ayahDone: j['ayahDone'] as int? ?? 0,
-    ayahTotal: j['ayahTotal'] as int? ?? 1,
-    classroomEmail: j['classroomEmail'] as String?,
-    rewards: ((j['rewards'] as List?) ?? [])
-        .map((e) => Reward.fromJson(asMap(e)))
-        .toList(),
-    wishIndex: j['wishIndex'] as int?,
-    checks: ((j['checks'] as Map?) ?? {}).map(
-      (k, v) =>
-          MapEntry(k as String, _enumByName(DoneBy.values, v, DoneBy.kid)),
-    ),
-    timeouts: ((j['timeouts'] as List?) ?? [])
-        .map((e) => TimeOut.fromJson(asMap(e)))
-        .toList(),
-  );
+  factory Kid.fromJson(Map<String, dynamic> j) =>
+      Kid(
+          id: j['id'] as String,
+          name: j['name'] as String,
+          age: j['age'] as int,
+          theme: j['theme'] as String? ?? 'ocean',
+          examMode: j['examMode'] as bool? ?? false,
+          surahName: j['surahName'] as String? ?? '',
+          ayahDone: j['ayahDone'] as int? ?? 0,
+          ayahTotal: j['ayahTotal'] as int? ?? 1,
+          classroomEmail: j['classroomEmail'] as String?,
+          rewards: ((j['rewards'] as List?) ?? [])
+              .map((e) => Reward.fromJson(asMap(e)))
+              .toList(),
+          wishIndex: j['wishIndex'] as int?,
+          checks: ((j['checks'] as Map?) ?? {}).map(
+            (k, v) => MapEntry(
+              k as String,
+              _enumByName(DoneBy.values, v, DoneBy.kid),
+            ),
+          ),
+          timeouts: ((j['timeouts'] as List?) ?? [])
+              .map((e) => TimeOut.fromJson(asMap(e)))
+              .toList(),
+        )
+        ..classroomClasses = [
+          for (final c in (j['classroomClasses'] as List?) ?? const []) '$c',
+        ];
 }
 
 class PrayerSettings {

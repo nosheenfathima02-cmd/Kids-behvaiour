@@ -30,8 +30,20 @@ async function newPhone(b, name) {
   await p.waitForTimeout(600);
   return p;
 }
-const tap = async (p, name, opts = {}) => { console.log('  tap', String(name)); await p.getByRole('button', { name, ...opts }).first().click({ timeout: 8000, force: true }); await p.waitForTimeout(900); };
-const type = async (p, label, text) => { const f = p.locator(`input[aria-label="${label}"], textarea[aria-label="${label}"]`).or(p.getByRole('textbox', { name: label })).first(); await f.click({ force: true, timeout: 5000 }); await p.waitForTimeout(400); await p.keyboard.type(text, { delay: 30 }); await p.waitForTimeout(300); };
+// Scrolls the Flutter page until the element is on screen (the picture on
+// the first screens pushes some buttons below the fold).
+async function reveal(p, loc) {
+  const vh = p.viewportSize().height;
+  for (let i = 0; i < 25; i++) {
+    const box = await loc.boundingBox().catch(() => null);
+    if (box && box.y >= 0 && box.y + box.height <= vh) return;
+    await p.mouse.move(p.viewportSize().width / 2, vh / 2);
+    await p.mouse.wheel(0, !box || box.y > vh / 2 ? 300 : -300);
+    await p.waitForTimeout(150);
+  }
+}
+const tap = async (p, name, opts = {}) => { console.log('  tap', String(name)); const b = p.getByRole('button', { name, ...opts }).first(); await b.waitFor({ state: 'attached', timeout: 8000 }); await reveal(p, b); await b.click({ timeout: 8000, force: true }); await p.waitForTimeout(900); };
+const type = async (p, label, text) => { const f = p.locator(`input[aria-label="${label}"], textarea[aria-label="${label}"]`).or(p.getByRole('textbox', { name: label })).first(); await f.waitFor({ state: 'attached', timeout: 8000 }); await reveal(p, f); await f.click({ force: true, timeout: 5000 }); await p.waitForTimeout(400); await p.keyboard.type(text, { delay: 30 }); await p.waitForTimeout(300); };
 const shot = (p, f) => p.screenshot({ path: `${__dirname}/screenshots/${f}` });
 
 (async () => {

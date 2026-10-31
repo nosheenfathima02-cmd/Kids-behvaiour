@@ -350,8 +350,16 @@ SchoolItem? datedItemFromNotice(ClassroomNotice n, String kidId, DateTime now) {
 }
 
 class ClassroomResult {
-  ClassroomResult(this.email, this.work, this.notices);
+  ClassroomResult(
+    this.email,
+    this.work,
+    this.notices, [
+    this.classNames = const [],
+  ]);
   final String email;
+
+  /// The Classroom classes found for this account, e.g. ["Grade 3"].
+  final List<String> classNames;
   final List<ClassroomWork> work;
   final List<ClassroomNotice> notices;
 }
@@ -458,15 +466,23 @@ class ClassroomClient {
       return asMap(jsonDecode(res.body));
     }
 
-    final courses = await get('/v1/courses', {
-      'studentId': 'me',
-      'courseStates': 'ACTIVE',
-      'pageSize': '30',
-    });
+    // Classes the account is in as a student (a child's account) or as a
+    // teacher (useful for teachers and for testing), without duplicates.
+    final courses = <String, Map<String, dynamic>>{};
+    for (final role in ['studentId', 'teacherId']) {
+      final page = await get('/v1/courses', {
+        role: 'me',
+        'courseStates': 'ACTIVE',
+        'pageSize': '30',
+      });
+      for (final c in (page['courses'] as List?) ?? const []) {
+        final course = asMap(c);
+        courses[course['id'] as String] = course;
+      }
+    }
     final work = <ClassroomWork>[];
     final notices = <ClassroomNotice>[];
-    for (final c in (courses['courses'] as List?) ?? const []) {
-      final course = asMap(c);
+    for (final course in courses.values) {
       final id = course['id'] as String;
       final announcements = await get('/v1/courses/$id/announcements', {
         'announcementStates': 'PUBLISHED',
@@ -480,14 +496,21 @@ class ClassroomClient {
           now,
         ),
       );
-      final submissions = await get(
-        '/v1/courses/$id/courseWork/-/studentSubmissions',
-        {
-          'userId': 'me',
-          'states': ['TURNED_IN', 'RETURNED'],
-          'pageSize': '100',
-        },
-      );
+      // Only students have their own submissions; a teacher's account gets
+      // an error here, which just means "nothing handed in".
+      Map<String, dynamic> submissions;
+      try {
+        submissions = await get(
+          '/v1/courses/$id/courseWork/-/studentSubmissions',
+          {
+            'userId': 'me',
+            'states': ['TURNED_IN', 'RETURNED'],
+            'pageSize': '100',
+          },
+        );
+      } on ClassroomException {
+        submissions = const {};
+      }
       final handedIn = {
         for (final s
             in (submissions['studentSubmissions'] as List?) ?? const [])
@@ -507,6 +530,8 @@ class ClassroomClient {
         ),
       );
     }
-    return ClassroomResult(email, work, notices);
+    return ClassroomResult(email, work, notices, [
+      for (final c in courses.values) (c['name'] as String?) ?? 'Class',
+    ]);
   }
 }

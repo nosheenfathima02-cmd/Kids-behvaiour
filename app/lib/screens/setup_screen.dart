@@ -21,7 +21,7 @@ class _SetupScreenState extends State<SetupScreen> {
   final _parentName = TextEditingController();
   final _phone = TextEditingController();
   int _age = 8;
-  String _theme = 'ocean';
+  String _theme = 'rose';
   City _city = cities.firstWhere((c) => c.name == 'Dubai');
 
   bool _busy = false;
@@ -61,7 +61,15 @@ class _SetupScreenState extends State<SetupScreen> {
               child: ListView(
                 padding: const EdgeInsets.all(20),
                 children: [
-                  const Icon(Icons.star_rounded, size: 56, color: starGold),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(20),
+                    child: Image.asset(
+                      'assets/images/welcome.jpg',
+                      height: 180,
+                      fit: BoxFit.cover,
+                      alignment: Alignment.topCenter,
+                    ),
+                  ),
                   Text(
                     'Assalamu alaikum!',
                     style: text.headlineMedium,

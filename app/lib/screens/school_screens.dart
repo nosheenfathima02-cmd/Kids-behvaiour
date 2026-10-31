@@ -133,9 +133,11 @@ class _SchoolTabState extends State<SchoolTab> {
               children: [
                 Text(
                   kid.classroomEmail == null
-                      ? "Import ${kid.name}'s homework and tests due in the next 2 weeks. "
-                            "You sign in with ${kid.name}'s school Google account; Super Mom only reads the classwork."
-                      : 'Last imported from ${kid.classroomEmail}. Sync again whenever new work is set.',
+                      ? "Import ${kid.name}'s homework, tests and teacher announcements. "
+                            "Sign in with the school Google account ${kid.name} uses in Classroom; Super Mom only reads."
+                      : 'Connected: ${kid.classroomEmail}\n'
+                            '${kid.classroomClasses.isEmpty ? 'No classes found for this account.' : 'Classes: ${kid.classroomClasses.join(', ')}'}\n'
+                            'Checks by itself once a day, or tap Sync now.',
                 ),
                 const SizedBox(height: 8),
                 if (ClassroomClient.supported)

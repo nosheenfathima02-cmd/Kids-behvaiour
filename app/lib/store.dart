@@ -1124,13 +1124,19 @@ class AppStore extends ChangeNotifier {
         }
       }
       if (updates.isNotEmpty) await _familyRef.update(updates);
-      if (kid.classroomEmail != result.email) {
+      if (kid.classroomEmail != result.email ||
+          !listEquals(kid.classroomClasses, result.classNames)) {
         kid.classroomEmail = result.email;
+        kid.classroomClasses = result.classNames;
         saveKid(kid);
       }
-      final count = result.work.length + result.notices.length;
-      if (count == 0) return 'Nothing new on Classroom for ${result.email}.';
-      return '${result.work.length} homework and tests, ${result.notices.length} announcements from Classroom ($added new).';
+      if (result.classNames.isEmpty) {
+        return '${result.email} is not in any Google Classroom class. '
+            "Connect the account ${kid.name} uses in Classroom (the one that joined the class).";
+      }
+      return 'Classes: ${result.classNames.join(', ')}. '
+          'Found ${result.work.length} homework/tests due in the next 2 weeks and '
+          '${result.notices.length} announcements from the last 7 days ($added new).';
     } on ClassroomException catch (e) {
       return interactive ? e.message : null;
     } catch (e) {
