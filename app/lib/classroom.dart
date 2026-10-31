@@ -37,6 +37,7 @@ class ClassroomWork {
     required this.title,
     required this.due,
     this.link,
+    this.handedIn = false,
   });
 
   final String courseId;
@@ -48,6 +49,9 @@ class ClassroomWork {
   final DateTime due;
   final String? link;
 
+  /// Already turned in (or returned by the teacher) in Classroom.
+  final bool handedIn;
+
   /// Stable id, so syncing again updates instead of duplicating.
   String get itemId =>
       's_cw_${'${courseId}_$workId'.replaceAll(RegExp(r'[^A-Za-z0-9_]'), '')}';
@@ -58,8 +62,8 @@ class ClassroomWork {
   ).hasMatch(title);
 }
 
-/// Turns one courses.courseWork.list response into upcoming, not yet
-/// handed-in work. Work without a due date is skipped.
+/// Turns one courses.courseWork.list response into upcoming work, marking
+/// what the child already handed in. Work without a due date is skipped.
 List<ClassroomWork> parseCourseWork(
   Map<String, dynamic> json,
   String courseName,
@@ -72,7 +76,7 @@ List<ClassroomWork> parseCourseWork(
   for (final w in (json['courseWork'] as List?) ?? const []) {
     final m = asMap(w);
     final d = m['dueDate'] == null ? null : asMap(m['dueDate']);
-    if (d == null || handedIn.contains(m['id'])) continue;
+    if (d == null) continue;
     final t = m['dueTime'] == null ? <String, dynamic>{} : asMap(m['dueTime']);
     // Classroom gives due dates in UTC; no time means the end of that day.
     final due = (t.isEmpty
@@ -93,6 +97,7 @@ List<ClassroomWork> parseCourseWork(
         title: (m['title'] as String? ?? 'Classwork').trim(),
         due: due,
         link: m['alternateLink'] as String?,
+        handedIn: handedIn.contains(m['id']),
       ),
     );
   }

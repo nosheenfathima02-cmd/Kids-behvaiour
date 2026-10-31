@@ -194,9 +194,11 @@ void main() {
       ],
     };
 
-    test('keeps upcoming work that is not handed in', () {
+    test('keeps upcoming work and marks what is handed in', () {
       final work = parseCourseWork(response, 'Maths 5B', {'cw3'}, now);
-      expect(work.map((w) => w.workId), ['cw1', 'cw2']);
+      expect(work.map((w) => w.workId), ['cw1', 'cw2', 'cw3']);
+      expect(work.firstWhere((w) => w.workId == 'cw3').handedIn, isTrue);
+      expect(work.first.handedIn, isFalse);
       expect(work.first.courseName, 'Maths 5B');
       expect(work[1].looksLikeTest, isTrue);
       expect(work.first.looksLikeTest, isFalse);

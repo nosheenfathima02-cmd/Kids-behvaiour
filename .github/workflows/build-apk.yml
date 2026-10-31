@@ -36,7 +36,7 @@ jobs:
           if ! grep -q "projectId: .super-mom-" lib/firebase_options.dart; then
             echo "::warning::lib/firebase_options.dart is still the placeholder. The APK installs, but sign-in will not work until the Firebase project is connected (README: Connect your Firebase project)."
           fi
-      # Google Classroom stays hidden until Google has verified it (store/LAUNCH.md).
+      # Test builds include Google Classroom; store builds hide it with --dart-define=CLASSROOM=false until Google has verified it (store/LAUNCH.md).
       # Without android/key.properties the APK is signed with the shared test key: fine for testing, not for Google Play.
       # Adhan: when app/assets/audio/adhan.mp3 is in the repository it plays at
       # each prayer time (Android notification sound) and from "Play adhan".
@@ -51,7 +51,7 @@ jobs:
           fi
       # Each build gets its own number, shown in the app (Settings and the welcome screen).
       - run: >-
-          flutter build apk --release --dart-define=CLASSROOM=false $ADHAN_DEFINE
+          flutter build apk --release $ADHAN_DEFINE
           --build-number=${{ github.run_number }} --build-name=1.0.${{ github.run_number }}
           --dart-define=BUILD=${{ github.run_number }}
       - name: Publish as the "Latest test build" release

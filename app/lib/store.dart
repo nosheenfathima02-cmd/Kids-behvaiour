@@ -907,6 +907,7 @@ class AppStore extends ChangeNotifier {
     try {
       final result = await ClassroomClient.fetch(now);
       final updates = <Object, Object?>{};
+      final ticks = <String, String>{};
       var added = 0;
       for (final w in result.work) {
         final existing = family.schoolItems
@@ -915,14 +916,34 @@ class AppStore extends ChangeNotifier {
         if (existing == null) added++;
         final item = schoolItemFor(w, kid.id, now, existing: existing);
         updates[FieldPath(['schoolItems', item.id])] = item.toJson();
+        // Handed in on Classroom: tick the homework task, so it counts
+        // towards this week's stars like any other task.
+        final day = item.fromYmd == null ? null : dateFromYmd(item.fromYmd!);
+        if (w.handedIn &&
+            day != null &&
+            weekIdFor(day) == currentWeekId &&
+            day.weekday <= 5) {
+          final key = Kid.key(day.weekday, item.id);
+          if (!kid.checks.containsKey(key)) ticks[key] = DoneBy.mom.name;
+        }
       }
       if (updates.isNotEmpty) await _familyRef.update(updates);
+      if (ticks.isNotEmpty) {
+        await _weekRef(kid.id).set({
+          'kidId': kid.id,
+          'weekId': currentWeekId,
+          'checks': ticks,
+        }, SetOptions(merge: true));
+      }
       kid.classroomEmail = result.email;
       saveKid(kid);
       if (result.work.isEmpty) {
         return 'No Classroom work due in the next 2 weeks for ${result.email}.';
       }
-      return '${result.work.length} item${result.work.length == 1 ? '' : 's'} from Classroom ($added new).';
+      final ticked = ticks.isEmpty
+          ? ''
+          : ' ${ticks.length} handed in, ticked for ${kid.name}.';
+      return '${result.work.length} item${result.work.length == 1 ? '' : 's'} from Classroom ($added new).$ticked';
     } on ClassroomException catch (e) {
       return e.message;
     } catch (e) {
