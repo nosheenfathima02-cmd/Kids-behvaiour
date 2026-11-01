@@ -547,11 +547,18 @@ class ClassroomClient {
             in (submissions['studentSubmissions'] as List?) ?? const [])
           asMap(s)['courseWorkId'] as String,
       };
-      final list = await get('/v1/courses/$id/courseWork', {
-        'courseWorkStates': 'PUBLISHED',
-        'orderBy': 'dueDate desc',
-        'pageSize': '30',
-      });
+      // A teacher's account may not be allowed to list classwork with the
+      // student permission; the announcements above still come through.
+      Map<String, dynamic> list;
+      try {
+        list = await get('/v1/courses/$id/courseWork', {
+          'courseWorkStates': 'PUBLISHED',
+          'orderBy': 'dueDate desc',
+          'pageSize': '30',
+        });
+      } on ClassroomException {
+        list = const {};
+      }
       work.addAll(
         parseCourseWork(
           list,
