@@ -88,8 +88,8 @@ beforeEach(async () => {
     await setDoc(doc(db, `families/${FID}`), {
       parents: ['mom'], tzOffsetMin: TZ, routine, schoolItems, prayerWindows: { [ymd(now)]: pw }, prayer: { city: 'Dubai' },
     });
-    await setDoc(doc(db, `families/${FID}/kids/aisha`), { name: 'Aisha', rewards: [{ name: 'Park', stars: 10 }, { name: 'Dinner', stars: 8 }] });
-    await setDoc(doc(db, `families/${FID}/kids/yusuf`), { name: 'Yusuf', rewards: [] });
+    await setDoc(doc(db, `families/${FID}/kids/aisha`), { name: 'Aisha', age: 11, rewards: [{ name: 'Park', stars: 10 }, { name: 'Dinner', stars: 8 }] });
+    await setDoc(doc(db, `families/${FID}/kids/yusuf`), { name: 'Yusuf', age: 7, rewards: [] });
     await setDoc(doc(db, `families/${FID}/devices/dev-aisha`), { kidIds: ['aisha'], name: "Aisha's tablet", pairCode: 'OLDCODE1', pairedAt: Timestamp.now() });
   });
 });
@@ -274,6 +274,53 @@ describe('school items (homework, tests, competitions)', () => {
   test('only parents can add or move homework', async () => {
     await assertFails(updateDoc(doc(aishaTablet(), `families/${FID}`), { 'schoolItems.s_tomorrow.fromYmd': ymd(now) }));
     await assertSucceeds(updateDoc(doc(mom(), `families/${FID}`), { 'schoolItems.s_new': school('aisha', tomorrow, tomorrow, 0, 600) }));
+  });
+});
+
+describe("a child's own Google Classroom import", () => {
+  const kidSchool = (db, kid = 'aisha') => doc(db, `families/${FID}/kidSchool/${kid}`);
+  const imported = (items, email = 'aisha@school.org') => ({ items, email, classes: ['Grade 5'] });
+
+  test('an older child can import their homework and tick it while it is open', async () => {
+    const db = aishaTablet();
+    await assertSucceeds(setDoc(kidSchool(db), imported({ s_cw1: school('aisha', ymd(now), ymd(now), Math.max(0, nowMin - 30), Math.min(1439, nowMin + 30)) })));
+    await assertSucceeds(getDoc(kidSchool(db)));
+    await assertSucceeds(tick(db, 's_cw1'));
+  });
+
+  test("an imported item for a brother, or one that is closed, cannot be ticked", async () => {
+    const db = aishaTablet();
+    await assertSucceeds(setDoc(kidSchool(db), imported({
+      s_cwYusuf: school('yusuf', ymd(now), ymd(now), 0, 1439),
+      s_cwClosed: school('aisha', ymd(now), ymd(now), closedWindow[0], closedWindow[1]),
+    })));
+    await assertFails(tick(db, 's_cwYusuf'));
+    await assertFails(tick(db, 's_cwClosed'));
+  });
+
+  test("a child cannot write a brother's import or extra fields", async () => {
+    await assertFails(setDoc(kidSchool(aishaTablet(), 'yusuf'), imported({})));
+    await assertFails(setDoc(kidSchool(aishaTablet()), { ...imported({}), stars: 10 }));
+    await assertFails(setDoc(kidSchool(stranger()), imported({})));
+  });
+
+  test('Mom decides: too young by default, or switched off', async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), `families/${FID}/devices/dev-yusuf`), { kidIds: ['yusuf'], name: 'Yusuf tab', pairCode: 'OLDCODE2', pairedAt: Timestamp.now() });
+    });
+    await assertFails(setDoc(kidSchool(device('dev-yusuf'), 'yusuf'), imported({})));
+    await assertSucceeds(updateDoc(doc(mom(), `families/${FID}/kids/yusuf`), { classroomSelf: true }));
+    await assertSucceeds(setDoc(kidSchool(device('dev-yusuf'), 'yusuf'), imported({}, 'yusuf@school.org')));
+    await assertSucceeds(updateDoc(doc(mom(), `families/${FID}/kids/aisha`), { classroomSelf: false }));
+    await assertFails(setDoc(kidSchool(aishaTablet()), imported({})));
+  });
+
+  test("Mom can see and remove what was imported; the child cannot delete it", async () => {
+    await assertSucceeds(setDoc(kidSchool(aishaTablet()), imported({ s_cw1: school('aisha', tomorrow, tomorrow, 0, 600) })));
+    await assertSucceeds(getDocs(collection(mom(), `families/${FID}/kidSchool`)));
+    await assertFails(deleteDoc(kidSchool(aishaTablet())));
+    await assertSucceeds(updateDoc(kidSchool(mom()), { 'items.s_cw1': deleteField() }));
+    await assertSucceeds(deleteDoc(kidSchool(mom())));
   });
 });
 

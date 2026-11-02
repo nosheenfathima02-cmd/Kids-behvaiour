@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../classroom.dart';
 import '../content.dart';
 import '../logic.dart';
 import '../models.dart';
@@ -198,6 +199,17 @@ class _KidEditorScreenState extends State<KidEditorScreen> {
             value: kid.examMode,
             onChanged: (v) => update(() => kid.examMode = v),
           ),
+          if (classroomEnabled)
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Can connect Google Classroom on their device'),
+              subtitle: Text(
+                'For older children: ${kid.name.isEmpty ? 'they' : kid.name} signs in with their school account '
+                'on their own phone or tablet. You still see and can remove everything here.',
+              ),
+              value: kid.mayConnectClassroom,
+              onChanged: (v) => update(() => kid.classroomSelf = v),
+            ),
           const Divider(height: 32),
           Text(
             "Qur'an memorisation this week",
@@ -716,6 +728,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               store.saveSettings();
             },
           ),
+          if (store.family.adhanEnabled) const AdhanCheck(showTest: true),
           const Divider(height: 32),
           Text(
             "Children's devices",

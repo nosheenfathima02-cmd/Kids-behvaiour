@@ -139,6 +139,14 @@ class _SchoolTabState extends State<SchoolTab> {
                             '${kid.classroomClasses.isEmpty ? 'No classes found for this account.' : 'Classes: ${kid.classroomClasses.join(', ')}'}\n'
                             'Checks by itself once a day, or tap Sync now.',
                 ),
+                if (kid.selfClassroomEmail != null) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    "Connected on ${kid.name}'s device: ${kid.selfClassroomEmail}"
+                    '${kid.selfClassroomClasses.isEmpty ? '' : ' (${kid.selfClassroomClasses.join(', ')})'}',
+                    style: const TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                ],
                 const SizedBox(height: 8),
                 if (ClassroomClient.supported)
                   FilledButton.tonalIcon(
@@ -759,6 +767,72 @@ class _FocusTimerCardState extends State<FocusTimerCard> {
               tooltip: 'Reset',
               onPressed: _reset,
               icon: const Icon(Icons.replay),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ---------------- child's device: connect my own Classroom ----------------
+
+/// On an older child's own device: connect their school Google account so
+/// homework, tests and teacher announcements arrive by themselves.
+class KidClassroomCard extends StatefulWidget {
+  const KidClassroomCard({super.key, required this.kid});
+  final Kid kid;
+
+  @override
+  State<KidClassroomCard> createState() => _KidClassroomCardState();
+}
+
+class _KidClassroomCardState extends State<KidClassroomCard> {
+  bool _syncing = false;
+
+  Future<void> _sync(AppStore store) async {
+    setState(() => _syncing = true);
+    final msg = await store.syncClassroom(widget.kid);
+    if (!mounted) return;
+    setState(() => _syncing = false);
+    if (msg != null) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final store = StoreScope.of(context);
+    final kid = widget.kid;
+    final email = kid.selfClassroomEmail;
+    return Padding(
+      padding: const EdgeInsets.only(top: 12),
+      child: SectionCard(
+        title: 'My Google Classroom',
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              email == null
+                  ? 'Sign in with your school account and your homework, tests and '
+                        "teacher's announcements will show up here with reminders."
+                  : 'Connected: $email'
+                        '${kid.selfClassroomClasses.isEmpty ? '' : '\nClasses: ${kid.selfClassroomClasses.join(', ')}'}\n'
+                        'Checks by itself every day.',
+            ),
+            const SizedBox(height: 8),
+            FilledButton.tonalIcon(
+              onPressed: _syncing ? null : () => _sync(store),
+              icon: _syncing
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : Icon(email == null ? Icons.school_outlined : Icons.sync),
+              label: Text(
+                email == null ? 'Connect my school account' : 'Check now',
+              ),
             ),
           ],
         ),

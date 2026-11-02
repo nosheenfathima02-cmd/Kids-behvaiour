@@ -87,7 +87,7 @@ service cloud.firestore {
       let minute = t.hours() * 60 + t.minutes();
       return parts.size() == 2
         && parts[0] == string(t.dayOfWeek())
-        && (routineTaskOk(fam, kidId, parts[1], t, minute) || schoolTaskOk(fam, kidId, parts[1], t, minute));
+        && (routineTaskOk(fam, kidId, parts[1], t, minute) || schoolTaskOk(fid, fam, kidId, parts[1], t, minute));
     }
 
     function routineTaskOk(fam, kidId, taskId, t, minute) {
@@ -103,8 +103,24 @@ service cloud.firestore {
         );
     }
 
-    function schoolTaskOk(fam, kidId, taskId, t, minute) {
-      return taskId in fam.get('schoolItems', {}) && schoolWindowOk(fam.schoolItems[taskId], kidId, t, minute);
+    function schoolTaskOk(fid, fam, kidId, taskId, t, minute) {
+      return (taskId in fam.get('schoolItems', {}) && schoolWindowOk(fam.schoolItems[taskId], kidId, t, minute))
+        || kidSchoolTaskOk(fid, kidId, taskId, t, minute);
+    }
+
+    // Homework a child imported from Google Classroom on their own device.
+    function kidSchoolTaskOk(fid, kidId, taskId, t, minute) {
+      let path = /databases/$(database)/documents/families/$(fid)/kidSchool/$(kidId);
+      return exists(path)
+        && taskId in get(path).data.get('items', {})
+        && schoolWindowOk(get(path).data.items[taskId], kidId, t, minute);
+    }
+
+    // Mom decides whether a child may connect Classroom on their own device
+    // (unset: from age 10).
+    function mayConnectClassroom(fid, kidId) {
+      let kid = get(/databases/$(database)/documents/families/$(fid)/kids/$(kidId)).data;
+      return kid.get('classroomSelf', kid.age >= 10) == true;
     }
 
     // On a school day between fromYmd and toYmd, inside the item's time window.
@@ -178,6 +194,17 @@ service cloud.firestore {
         );
       }
 
+      // What a child imported from Google Classroom on their own device.
+      // Only that child's devices can add to it; Mom can see and remove it.
+      match /kidSchool/{kidId} {
+        allow read: if isParent(fid) || deviceFor(fid, kidId);
+        allow delete: if isParent(fid);
+        allow update: if isParent(fid) || (
+          deviceFor(fid, kidId) && mayConnectClassroom(fid, kidId) && kidSchoolOk()
+        );
+        allow create: if deviceFor(fid, kidId) && mayConnectClassroom(fid, kidId) && kidSchoolOk();
+      }
+
       // Linked children's devices. A device can see and remove its own link.
       match /devices/{uid} {
         allow get, delete: if isParent(fid) || (signedIn() && request.auth.uid == uid);
@@ -203,6 +230,14 @@ service cloud.firestore {
       match /parentTokens/{token} {
         allow read, write: if isParent(fid);
       }
+    }
+
+    function kidSchoolOk() {
+      let d = request.resource.data;
+      return d.keys().hasOnly(['items', 'email', 'classes', 'updatedAt'])
+        && d.items is map && d.items.size() <= 300
+        && d.email is string && d.email.size() <= 120
+        && d.classes is list && d.classes.size() <= 30;
     }
 
     // ---------- linking a child's device ----------

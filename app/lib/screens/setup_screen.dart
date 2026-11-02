@@ -21,7 +21,7 @@ class _SetupScreenState extends State<SetupScreen> {
   final _parentName = TextEditingController();
   final _phone = TextEditingController();
   int _age = 8;
-  String _theme = 'rose';
+  String _theme = 'butterfly';
   City _city = cities.firstWhere((c) => c.name == 'Dubai');
 
   bool _busy = false;
@@ -208,32 +208,56 @@ class ThemePicker extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Wrap(
       spacing: 10,
       runSpacing: 10,
       children: [
         for (final e in kidThemes.entries)
-          Tooltip(
-            message: e.value.name,
+          Semantics(
+            selected: e.key == value,
+            button: true,
+            label: '${e.value.name} theme',
             child: InkWell(
-              customBorder: const CircleBorder(),
+              borderRadius: BorderRadius.circular(18),
               onTap: () => onChanged(e.key),
-              child: Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: e.value.color,
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    width: 3,
-                    color: e.key == value
-                        ? Theme.of(context).colorScheme.onSurface
-                        : Colors.transparent,
+              child: Column(
+                children: [
+                  AnimatedContainer(
+                    duration: const Duration(milliseconds: 150),
+                    width: 64,
+                    height: 64,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      gradient: e.value.gradient,
+                      borderRadius: BorderRadius.circular(18),
+                      border: Border.all(
+                        width: 3,
+                        color: e.key == value
+                            ? cs.onSurface
+                            : Colors.transparent,
+                      ),
+                    ),
+                    child: Text(
+                      e.value.emoji,
+                      style: const TextStyle(fontSize: 28),
+                    ),
                   ),
-                ),
-                child: e.key == value
-                    ? const Icon(Icons.check, color: Colors.white)
-                    : null,
+                  const SizedBox(height: 4),
+                  SizedBox(
+                    width: 72,
+                    child: Text(
+                      e.value.name,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: e.key == value
+                            ? FontWeight.w800
+                            : FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ),

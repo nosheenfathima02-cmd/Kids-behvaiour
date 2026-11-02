@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../classroom.dart';
 import '../content.dart';
 import '../logic.dart';
 
@@ -88,19 +89,39 @@ class KidEntryScreen extends StatelessWidget {
                     children: [
                       for (final k in kids)
                         InkWell(
-                          borderRadius: BorderRadius.circular(20),
+                          borderRadius: BorderRadius.circular(24),
                           onTap: () => Navigator.of(context).push(
                             MaterialPageRoute(builder: (_) => KidHome(kid: k)),
                           ),
-                          child: Padding(
-                            padding: const EdgeInsets.all(12),
+                          child: Container(
+                            width: 140,
+                            padding: const EdgeInsets.symmetric(vertical: 18),
+                            decoration: BoxDecoration(
+                              gradient: themeOf(k).gradient,
+                              borderRadius: BorderRadius.circular(24),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: themeOf(k).color
+                                      .withValues(alpha: 0.3),
+                                  blurRadius: 12,
+                                  offset: const Offset(0, 4),
+                                ),
+                              ],
+                            ),
                             child: Column(
                               children: [
-                                KidAvatar(kid: k, radius: 44),
+                                Text(
+                                  themeOf(k).emoji,
+                                  style: const TextStyle(fontSize: 44),
+                                ),
                                 const SizedBox(height: 8),
                                 Text(
                                   k.name,
-                                  style: Theme.of(context).textTheme.titleLarge,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.w800,
+                                  ),
                                 ),
                               ],
                             ),
@@ -121,18 +142,33 @@ class KidAvatar extends StatelessWidget {
   final double radius;
 
   @override
-  Widget build(BuildContext context) => CircleAvatar(
-    radius: radius,
-    backgroundColor: themeOf(kid).color,
-    child: Text(
-      kid.name.isEmpty ? '?' : kid.name[0].toUpperCase(),
-      style: TextStyle(
-        color: Colors.white,
-        fontWeight: FontWeight.w700,
-        fontSize: radius * 0.9,
+  Widget build(BuildContext context) {
+    final t = themeOf(kid);
+    return Container(
+      width: radius * 2,
+      height: radius * 2,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: t.gradient,
+        boxShadow: [
+          BoxShadow(
+            color: t.color.withValues(alpha: 0.3),
+            blurRadius: radius * 0.4,
+            offset: Offset(0, radius * 0.1),
+          ),
+        ],
       ),
-    ),
-  );
+      child: Text(
+        kid.name.isEmpty ? '?' : kid.name[0].toUpperCase(),
+        style: TextStyle(
+          color: Colors.white,
+          fontWeight: FontWeight.w800,
+          fontSize: radius * 0.9,
+        ),
+      ),
+    );
+  }
 }
 
 class KidHome extends StatelessWidget {
@@ -142,62 +178,63 @@ class KidHome extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final store = StoreScope.of(context);
-    final color = themeOf(kid).color;
+    final t = themeOf(kid);
     final brightness = Theme.of(context).brightness;
     return Theme(
-      data: buildTheme(color, brightness),
+      data: buildKidTheme(t, brightness),
       child: Builder(
         builder: (context) {
           return Scaffold(
-            appBar: AppBar(
-              title: Text("${kid.name}'s day"),
-              actions: [
-                IconButton(
-                  tooltip: 'Parent',
-                  icon: const Icon(Icons.lock_outline),
-                  onPressed: () => openParentArea(context),
+            body: ListView(
+              padding: EdgeInsets.zero,
+              children: [
+                _Hero(kid: kid, store: store),
+                Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 560),
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          if (kid.examMode) ...[
+                            const _Banner(
+                              "📖 Exam week! Only salah, Qur'an and study today. You can do it, in sha Allah.",
+                            ),
+                            const SizedBox(height: 12),
+                          ],
+                          if (store.isWeekend) ...[
+                            _Banner(
+                              '🎉 It\'s the weekend! You earned ${store.score(kid).total} stars this week. '
+                              'A new week starts on Monday.',
+                            ),
+                            const SizedBox(height: 12),
+                          ],
+                          _StarsCard(kid: kid, store: store),
+                          const SizedBox(height: 12),
+                          _PrayerCard(store: store),
+                          if (!store.isWeekend) ...[
+                            const SizedBox(height: 12),
+                            _JobsCard(kid: kid, store: store),
+                            if (kid.examMode) const FocusTimerCard(),
+                          ],
+                          KidSchoolCard(kid: kid),
+                          // On the child's own device (not Mom's phone in kids mode).
+                          if (!store.isParent &&
+                              classroomEnabled &&
+                              ClassroomClient.supported &&
+                              kid.mayConnectClassroom)
+                            KidClassroomCard(kid: kid),
+                          const SizedBox(height: 12),
+                          _QuranCard(kid: kid),
+                          const SizedBox(height: 12),
+                          _RewardsCard(kid: kid, store: store),
+                        ],
+                      ),
+                    ),
+                  ),
                 ),
               ],
-            ),
-            body: Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 560),
-                child: ListView(
-                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
-                  children: [
-                    _Greeting(kid: kid, store: store),
-                    const SizedBox(height: 12),
-                    _ReminderCard(color: color, store: store),
-                    if (kid.examMode) ...[
-                      const SizedBox(height: 12),
-                      const _Banner(
-                        "Exam week! Only salah, Qur'an and study today. You can do it, in sha Allah.",
-                      ),
-                    ],
-                    if (store.isWeekend) ...[
-                      const SizedBox(height: 12),
-                      _Banner(
-                        'It\'s the weekend! You earned ${store.score(kid).total} stars this week. '
-                        'A new week starts on Monday.',
-                      ),
-                    ],
-                    const SizedBox(height: 12),
-                    _StarsCard(kid: kid, store: store),
-                    const SizedBox(height: 12),
-                    _PrayerCard(store: store),
-                    if (!store.isWeekend) ...[
-                      const SizedBox(height: 12),
-                      _JobsCard(kid: kid, store: store),
-                      if (kid.examMode) const FocusTimerCard(),
-                    ],
-                    KidSchoolCard(kid: kid),
-                    const SizedBox(height: 12),
-                    _QuranCard(kid: kid),
-                    const SizedBox(height: 12),
-                    _RewardsCard(kid: kid, store: store),
-                  ],
-                ),
-              ),
             ),
           );
         },
@@ -206,77 +243,153 @@ class KidHome extends StatelessWidget {
   }
 }
 
-class _Greeting extends StatelessWidget {
-  const _Greeting({required this.kid, required this.store});
+/// The colourful top of a child's page: greeting, time and today's reminder,
+/// on their theme's gradient with its little pictures.
+class _Hero extends StatelessWidget {
+  const _Hero({required this.kid, required this.store});
   final Kid kid;
   final AppStore store;
 
   @override
   Widget build(BuildContext context) {
-    final text = Theme.of(context).textTheme;
-    return Row(
-      children: [
-        KidAvatar(kid: kid, radius: 26),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Salam, ${kid.name}!',
-                style: text.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.w700,
+    final t = themeOf(kid);
+    final r = reminderFor(store.now);
+    final canPop = Navigator.of(context).canPop();
+    Widget sprinkle(double? left, double? right, double top, double size) =>
+        Positioned(
+          left: left,
+          right: right,
+          top: top,
+          child: Opacity(
+            opacity: 0.22,
+            child: Text(t.emoji, style: TextStyle(fontSize: size)),
+          ),
+        );
+    return Container(
+      decoration: BoxDecoration(
+        gradient: t.gradient,
+        borderRadius: const BorderRadius.vertical(bottom: Radius.circular(32)),
+      ),
+      child: Stack(
+        children: [
+          sprinkle(null, 18, 54, 56),
+          sprinkle(null, 92, 18, 26),
+          sprinkle(null, 150, 64, 18),
+          SafeArea(
+            bottom: false,
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 560),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(8, 4, 8, 22),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          if (canPop)
+                            const BackButton(color: Colors.white)
+                          else
+                            const SizedBox(width: 8),
+                          const Spacer(),
+                          IconButton(
+                            tooltip: 'Parent',
+                            color: Colors.white,
+                            icon: const Icon(Icons.lock_outline),
+                            onPressed: () => openParentArea(context),
+                          ),
+                        ],
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                        child: Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(3),
+                              decoration: const BoxDecoration(
+                                color: Colors.white,
+                                shape: BoxShape.circle,
+                              ),
+                              child: KidAvatar(kid: kid, radius: 28),
+                            ),
+                            const SizedBox(width: 14),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Salam, ${kid.name}! ${t.emoji}',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 26,
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                  ),
+                                  Text(
+                                    '${weekdayNames[store.todayWeekday]} · ${formatMinute(store.nowMinute)}',
+                                    style: TextStyle(
+                                      color: Colors.white.withValues(
+                                        alpha: 0.9,
+                                      ),
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Container(
+                        margin: const EdgeInsets.symmetric(horizontal: 8),
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.18),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                            color: Colors.white.withValues(alpha: 0.35),
+                          ),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              "✨ TODAY'S REMINDER",
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: 1,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              '“${r.text}”',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 18,
+                                fontWeight: FontWeight.w700,
+                                height: 1.3,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              r.source,
+                              style: TextStyle(
+                                color: Colors.white.withValues(alpha: 0.9),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
-              Text(
-                '${weekdayNames[store.todayWeekday]} · ${formatMinute(store.nowMinute)}',
-                style: text.bodyMedium,
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _ReminderCard extends StatelessWidget {
-  const _ReminderCard({required this.color, required this.store});
-  final Color color;
-  final AppStore store;
-
-  @override
-  Widget build(BuildContext context) {
-    final r = reminderFor(store.now);
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: color,
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            "TODAY'S REMINDER",
-            style: TextStyle(
-              color: Colors.white70,
-              fontSize: 11,
-              fontWeight: FontWeight.w800,
-              letterSpacing: 1,
             ),
           ),
-          const SizedBox(height: 4),
-          Text(
-            '“${r.text}”',
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 18,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(r.source, style: const TextStyle(color: Colors.white)),
         ],
       ),
     );
@@ -356,6 +469,7 @@ class _PrayerCard extends StatelessWidget {
         children: [
           _prayerRow(p, next, cs),
           if (adhanAsset != null) const _AdhanButton(),
+          if (store.family.adhanEnabled) const AdhanCheck(),
         ],
       ),
     );
@@ -634,4 +748,117 @@ class _AdhanButtonState extends State<_AdhanButton> {
       label: Text(_playing ? 'Stop adhan' : 'Play adhan'),
     ),
   );
+}
+
+/// Checks that Android lets the adhan ring at the exact minute, and (in
+/// Settings) lets a parent hear a test adhan a minute later.
+class AdhanCheck extends StatefulWidget {
+  const AdhanCheck({super.key, this.showTest = false});
+  final bool showTest;
+
+  @override
+  State<AdhanCheck> createState() => _AdhanCheckState();
+}
+
+class _AdhanCheckState extends State<AdhanCheck> with WidgetsBindingObserver {
+  bool _onTime = true;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _check();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  // Back from Android's settings page.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _check();
+  }
+
+  Future<void> _check() async {
+    final ok = await Notifications.canRingOnTime();
+    if (!mounted || ok == _onTime) return;
+    setState(() => _onTime = ok);
+    // Just allowed: schedule the adhan again at the exact minutes.
+    if (ok) StoreScope.of(context).rescheduleReminders();
+  }
+
+  Future<void> _test() async {
+    final ok = await Notifications.testAdhan();
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        duration: const Duration(seconds: 8),
+        content: Text(
+          ok
+              ? 'The adhan will play in 1 minute. Lock the phone and wait. '
+                    "If it doesn't play, check that notifications for Super Mom are on "
+                    'and the alarm volume is up.'
+              : 'Reminders work in the Android app, not here.',
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (!_onTime)
+          Container(
+            margin: const EdgeInsets.only(top: 8),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: cs.errorContainer,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.alarm, color: cs.onErrorContainer),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'Allow "Alarms & reminders" so the adhan plays exactly on time.',
+                    style: TextStyle(color: cs.onErrorContainer),
+                  ),
+                ),
+                TextButton(
+                  onPressed: () async {
+                    await Notifications.allowRingingOnTime();
+                    _check();
+                  },
+                  child: const Text('Allow'),
+                ),
+              ],
+            ),
+          ),
+        if (widget.showTest)
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: OutlinedButton.icon(
+              onPressed: _test,
+              icon: const Icon(Icons.notifications_active_outlined),
+              label: const Text('Test the adhan (plays in 1 minute)'),
+            ),
+          ),
+        if (widget.showTest)
+          const Padding(
+            padding: EdgeInsets.only(top: 6),
+            child: Text(
+              'The adhan plays at alarm volume. On some phones (Samsung, Xiaomi, '
+              'Oppo) also set Battery for Super Mom to "Unrestricted" so it is never stopped.',
+            ),
+          ),
+      ],
+    );
+  }
 }

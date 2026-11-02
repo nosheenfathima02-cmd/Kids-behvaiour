@@ -2,18 +2,88 @@ import 'package:flutter/material.dart';
 
 import 'models.dart';
 
+/// A child's look on their device: two colours for the header gradient, a
+/// soft background and a little picture that matches.
 class KidTheme {
-  const KidTheme(this.name, this.color);
+  const KidTheme(
+    this.name,
+    this.emoji,
+    this.color,
+    this.accent,
+    this.background,
+  );
   final String name;
+  final String emoji;
   final Color color;
+  final Color accent;
+
+  /// Page background in light mode.
+  final Color background;
+
+  LinearGradient get gradient => LinearGradient(
+    colors: [color, accent],
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+  );
 }
 
 const kidThemes = <String, KidTheme>{
-  'rose': KidTheme('Rose', Color(0xFFC9467E)),
-  'ocean': KidTheme('Ocean', Color(0xFF2F78C9)),
-  'garden': KidTheme('Garden', Color(0xFF2B8F55)),
-  'sunset': KidTheme('Sunset', Color(0xFFD9602A)),
-  'galaxy': KidTheme('Galaxy', Color(0xFF6F52D6)),
+  'butterfly': KidTheme(
+    'Butterfly',
+    '🦋',
+    Color(0xFF7B3FC4),
+    Color(0xFFE2457E),
+    Color(0xFFF8F1FF),
+  ),
+  'rose': KidTheme(
+    'Blossom',
+    '🌸',
+    Color(0xFFD63F7A),
+    Color(0xFFFF8FB1),
+    Color(0xFFFFF0F5),
+  ),
+  'galaxy': KidTheme(
+    'Galaxy',
+    '🚀',
+    Color(0xFF3B2A9C),
+    Color(0xFF8E5BEA),
+    Color(0xFFF1EEFF),
+  ),
+  'moon': KidTheme(
+    'Moonlight',
+    '🌙',
+    Color(0xFF1E3A6E),
+    Color(0xFF5E2B8C),
+    Color(0xFFEFF2FA),
+  ),
+  'ocean': KidTheme(
+    'Ocean',
+    '🐬',
+    Color(0xFF1F6FC5),
+    Color(0xFF22B8CF),
+    Color(0xFFEAF6FD),
+  ),
+  'garden': KidTheme(
+    'Garden',
+    '🌿',
+    Color(0xFF1F8A4C),
+    Color(0xFF8BC34A),
+    Color(0xFFEFF8EC),
+  ),
+  'sunset': KidTheme(
+    'Sunset',
+    '🌅',
+    Color(0xFFE0562B),
+    Color(0xFFF2A33A),
+    Color(0xFFFFF4EA),
+  ),
+  'desert': KidTheme(
+    'Desert gold',
+    '🐪',
+    Color(0xFFA8671A),
+    Color(0xFFE0A50F),
+    Color(0xFFFFF8E7),
+  ),
 };
 
 KidTheme themeOf(Kid k) => kidThemes[k.theme] ?? kidThemes['ocean']!;

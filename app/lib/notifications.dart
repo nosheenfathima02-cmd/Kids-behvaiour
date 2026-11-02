@@ -59,20 +59,87 @@ class Notifications {
           iOS: DarwinInitializationSettings(),
         ),
       );
-      await _plugin
-          .resolvePlatformSpecificImplementation<
-            AndroidFlutterLocalNotificationsPlugin
-          >()
-          ?.requestNotificationsPermission();
       _ready = true;
+      await _android?.requestNotificationsPermission();
     } catch (e) {
       debugPrint('Notifications unavailable: $e');
     }
     return _ready;
   }
 
-  /// Schedules prayer reminders for today and the next two days. Called
-  /// again every day the app opens, so it never runs out.
+  static AndroidFlutterLocalNotificationsPlugin? get _android => _plugin
+      .resolvePlatformSpecificImplementation<
+        AndroidFlutterLocalNotificationsPlugin
+      >();
+
+  /// Whether Android lets this app ring at the exact minute. Without it,
+  /// Android may hold the adhan back for many minutes to save battery.
+  static Future<bool> canRingOnTime() async {
+    if (!await _init()) return true;
+    return await _android?.canScheduleExactNotifications() ?? true;
+  }
+
+  /// Opens Android's "Alarms & reminders" page for this app.
+  static Future<bool> allowRingingOnTime() async {
+    if (!await _init()) return true;
+    await _android?.requestExactAlarmsPermission();
+    return canRingOnTime();
+  }
+
+  static Future<AndroidScheduleMode> _mode() async => await canRingOnTime()
+      ? AndroidScheduleMode.exactAllowWhileIdle
+      : AndroidScheduleMode.inexactAllowWhileIdle;
+
+  // Android fixes a channel's sound when it is created, so each sound has
+  // its own channel. The adhan plays at alarm volume (like an alarm clock),
+  // so a low notification volume or silent mode does not hide it.
+  static NotificationDetails _prayerDetails(bool fajr) {
+    final sound = fajr
+        ? (fajrAdhanBundled ? 'adhan_fajr' : null)
+        : (adhanSoundBundled ? 'adhan' : null);
+    final channel = sound == null
+        ? 'salah'
+        : (fajr ? 'adhan_fajr_alarm' : 'adhan_alarm');
+    return NotificationDetails(
+      android: AndroidNotificationDetails(
+        channel,
+        sound == null ? 'Salah times' : (fajr ? 'Fajr adhan' : 'Adhan'),
+        channelDescription: 'The adhan when each prayer time begins',
+        importance: Importance.max,
+        priority: Priority.max,
+        category: AndroidNotificationCategory.alarm,
+        audioAttributesUsage: sound == null
+            ? AudioAttributesUsage.notification
+            : AudioAttributesUsage.alarm,
+        sound: sound == null
+            ? null
+            : RawResourceAndroidNotificationSound(sound),
+      ),
+      iOS: DarwinNotificationDetails(
+        sound: sound == null ? null : '$sound.caf',
+      ),
+    );
+  }
+
+  /// Plays the adhan reminder a minute from now, so a parent can check that
+  /// it works with the phone locked.
+  static Future<bool> testAdhan() async {
+    if (!await _init()) return false;
+    await _plugin.zonedSchedule(
+      id: 99,
+      scheduledDate: tz.TZDateTime.now(tz.local)
+          .add(const Duration(minutes: 1)),
+      notificationDetails: _prayerDetails(false),
+      androidScheduleMode: await _mode(),
+      title: 'Adhan test',
+      body: 'This is how the adhan will sound at each prayer time.',
+    );
+    return true;
+  }
+
+  /// Schedules prayer reminders for today and the next six days. Called
+  /// again every day the app opens, so it keeps going even if the app is
+  /// not opened for several days.
   static Future<void> schedulePrayers(
     PrayerSettings settings, {
     required bool enabled,
@@ -80,6 +147,11 @@ class Notifications {
   }) async {
     if (!await _init()) return;
     await _plugin.cancelAll();
+    // Channels from earlier versions played at notification volume.
+    for (final old in ['adhan', 'adhan_fajr']) {
+      await _android?.deleteNotificationChannel(channelId: old);
+    }
+    final mode = await _mode();
     var reminderId = 100;
     for (final r in reminders.take(40)) {
       await _plugin.zonedSchedule(
@@ -100,38 +172,14 @@ class Notifications {
     }
     if (!enabled) return;
 
-    // Android fixes a channel's sound when it is created, so each sound has
-    // its own channel.
-    NotificationDetails details(String? sound, String channel, String name) =>
-        NotificationDetails(
-          android: AndroidNotificationDetails(
-            sound == null ? 'salah' : channel,
-            sound == null ? 'Salah times' : name,
-            channelDescription: 'A reminder when each prayer time begins',
-            importance: Importance.high,
-            priority: Priority.high,
-            sound: sound == null
-                ? null
-                : RawResourceAndroidNotificationSound(sound),
-          ),
-          iOS: DarwinNotificationDetails(
-            sound: sound == null ? null : '$sound.caf',
-          ),
-        );
-    final regular = details(
-      adhanSoundBundled ? 'adhan' : null,
-      'adhan',
-      'Adhan',
-    );
+    final regular = _prayerDetails(false);
     // The regular adhan lacks "as-salatu khayrun min an-nawm", so Fajr keeps
     // the plain sound until a Fajr recording is added.
-    final fajr = fajrAdhanBundled
-        ? details('adhan_fajr', 'adhan_fajr', 'Fajr adhan')
-        : details(null, 'salah', 'Salah times');
+    final fajr = _prayerDetails(true);
 
     final now = tz.TZDateTime.now(tz.local);
     var id = 0;
-    for (var day = 0; day < 3; day++) {
+    for (var day = 0; day < 7; day++) {
       final date = DateTime(
         now.year,
         now.month,
@@ -152,7 +200,7 @@ class Notifications {
           id: id++,
           scheduledDate: at,
           notificationDetails: e.key == Prayer.fajr ? fajr : regular,
-          androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+          androidScheduleMode: mode,
           title: "It's time for ${e.key.label}",
           body: 'Hayya ʿalaṣ-ṣalāh. Come to prayer!',
         );

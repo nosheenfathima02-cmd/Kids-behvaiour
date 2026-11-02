@@ -99,6 +99,12 @@ class AppStore extends ChangeNotifier {
   final Map<String, StreamSubscription<Object?>> _kidSubs = {};
   final Map<String, Kid> _kids = {};
   final Map<String, Map<String, dynamic>?> _weeks = {};
+
+  /// families/{fid}/kidSchool/{kidId}: what children imported from Google
+  /// Classroom on their own devices.
+  final Map<String, Map<String, dynamic>> _kidSchool = {};
+  final Set<String> _kidSchoolIds = {};
+  String _deviceClassroomDay = '';
   Map<String, dynamic>? _familyDoc;
   String _listeningWeek = '';
   Timer? _ticker;
@@ -565,6 +571,7 @@ class AppStore extends ChangeNotifier {
           'devices',
           'parentTokens',
           'parents',
+          'kidSchool',
         ]) {
           final docs = (await _familyRef.collection(sub).get()).docs;
           for (var i = 0; i < docs.length; i += 400) {
@@ -665,6 +672,17 @@ class AppStore extends ChangeNotifier {
         _rebuild();
       }, onError: _onListenError),
     );
+    _subs.add(
+      _familyRef.collection('kidSchool').snapshots().listen(
+        (s) {
+          _kidSchool
+            ..clear()
+            ..addAll({for (final d in s.docs) d.id: d.data()});
+          _rebuild();
+        },
+        onError: (_) {},
+      ), // Older security rules: nothing imported by children.
+    );
     _listenToWeeksAsParent();
     Notifications.registerParentPhone(_familyRef, auth.currentUser!.uid);
   }
@@ -738,6 +756,15 @@ class AppStore extends ChangeNotifier {
         _weeks[id] = s.data();
         _rebuild();
       }, onError: _onListenError);
+      _kidSubs['school:$id'] = _familyRef
+          .collection('kidSchool')
+          .doc(id)
+          .snapshots()
+          .listen((s) {
+            final d = s.data();
+            d == null ? _kidSchool.remove(id) : _kidSchool[id] = d;
+            _rebuild();
+          }, onError: (_) {}); // Older security rules: not available.
     }
   }
 
@@ -767,6 +794,8 @@ class AppStore extends ChangeNotifier {
     _kidSubs.clear();
     _kids.clear();
     _weeks.clear();
+    _kidSchool.clear();
+    _kidSchoolIds.clear();
     _familyDoc = null;
     devices = [];
     deviceKidIds = [];
@@ -789,6 +818,7 @@ class AppStore extends ChangeNotifier {
       k.applyWeek(_weeks[k.id]);
     }
     data = FamilyData.fromDoc(familyId!, doc, kids);
+    _mergeKidSchool(data!);
     if (isParent && !hasPin) {
       _setPhase(Phase.parentNeedsPin);
       return;
@@ -801,6 +831,28 @@ class AppStore extends ChangeNotifier {
     }
     _setPhase(Phase.ready);
     _maintain();
+  }
+
+  /// Adds what children imported on their own devices. Mom's copy of an
+  /// item (in the family document) wins.
+  void _mergeKidSchool(FamilyData fam) {
+    _kidSchoolIds.clear();
+    final have = {for (final i in fam.schoolItems) i.id};
+    for (final kid in fam.kids) {
+      final doc = _kidSchool[kid.id];
+      kid.selfClassroomEmail = doc?['email'] as String?;
+      kid.selfClassroomClasses = [
+        for (final c in (doc?['classes'] as List?) ?? const []) '$c',
+      ];
+      for (final e in ((doc?['items'] as Map?) ?? const {}).values) {
+        final item = tryParseSchoolItem(e);
+        if (item == null || item.kidId != kid.id || have.contains(item.id)) {
+          continue;
+        }
+        fam.schoolItems.add(item);
+        _kidSchoolIds.add(item.id);
+      }
+    }
   }
 
   void _setPhase(Phase p) {
@@ -821,6 +873,14 @@ class AppStore extends ChangeNotifier {
     }
     _maintain();
     notifyListeners(); // time windows open and close
+  }
+
+  /// Schedules this device's adhan and school reminders again (e.g. after
+  /// Android allowed exact alarms).
+  void rescheduleReminders() {
+    if (!isSetUp) return;
+    _scheduledFor = '';
+    _maintain();
   }
 
   /// Daily upkeep: reminders on this device, and (on a parent's phone) the
@@ -844,6 +904,10 @@ class AppStore extends ChangeNotifier {
     if (noticeKey != _announcedKey) {
       _announcedKey = noticeKey;
       Notifications.announceNotices(notices, (id) => kidById(id)?.name ?? '');
+    }
+    if (!isParent && _deviceClassroomDay != today) {
+      _deviceClassroomDay = today;
+      _deviceClassroomSync();
     }
     if (!isParent || _maintainedDay == today) return;
     _maintainedDay = today;
@@ -1007,6 +1071,7 @@ class AppStore extends ChangeNotifier {
   Future<void> removeKid(Kid kid) async {
     final batch = db.batch()
       ..delete(_familyRef.collection('kids').doc(kid.id))
+      ..delete(_familyRef.collection('kidSchool').doc(kid.id))
       ..delete(_weekRef(kid.id));
     for (final t in family.routine.where(
       (t) => t.kidIds?.contains(kid.id) ?? false,
@@ -1128,11 +1193,23 @@ class AppStore extends ChangeNotifier {
 
   void deleteSchoolItem(SchoolItem item) {
     family.schoolItems.removeWhere((x) => x.id == item.id);
-    _write(
-      _familyRef.update({
-        FieldPath(['schoolItems', item.id]): FieldValue.delete(),
-      }),
-    );
+    // It may be in the family document (Mom's), the child's own import, or both.
+    final inKidDoc = ((_kidSchool[item.kidId]?['items'] as Map?) ?? const {})
+        .containsKey(item.id);
+    if (inKidDoc) {
+      _write(
+        _familyRef.collection('kidSchool').doc(item.kidId).update({
+          FieldPath(['items', item.id]): FieldValue.delete(),
+        }),
+      );
+    }
+    if (!_kidSchoolIds.contains(item.id)) {
+      _write(
+        _familyRef.update({
+          FieldPath(['schoolItems', item.id]): FieldValue.delete(),
+        }),
+      );
+    }
     notifyListeners();
   }
 
@@ -1146,10 +1223,12 @@ class AppStore extends ChangeNotifier {
       final result = await ClassroomClient.fetch(
         now,
         interactive: interactive,
-        expectedEmail: interactive ? null : kid.classroomEmail,
+        expectedEmail: interactive
+            ? null
+            : (isParent ? kid.classroomEmail : kid.selfClassroomEmail),
       );
       if (result == null) return null;
-      final updates = <Object, Object?>{};
+      final updates = <String, Object?>{};
       var added = 0;
       for (final w in result.work) {
         final existing = family.schoolItems
@@ -1158,23 +1237,38 @@ class AppStore extends ChangeNotifier {
         if (existing == null) added++;
         final item = schoolItemFor(w, kid.id, now, existing: existing)
           ..handedIn = w.handedIn;
-        updates[FieldPath(['schoolItems', item.id])] = item.toJson();
+        updates[item.id] = item.toJson();
       }
       for (final n in result.notices) {
         if (!family.schoolItems.any((x) => x.id == n.itemId)) added++;
         final item = schoolItemForNotice(n, kid.id);
-        updates[FieldPath(['schoolItems', item.id])] = item.toJson();
+        updates[item.id] = item.toJson();
         // A test or date in the announcement becomes its own reminder; Mom's
         // later changes to it are kept.
         final dated = datedItemFromNotice(n, kid.id, now);
         if (dated != null && !family.schoolItems.any((x) => x.id == dated.id)) {
-          updates[FieldPath(['schoolItems', dated.id])] = dated.toJson();
+          updates[dated.id] = dated.toJson();
           added++;
         }
       }
-      if (updates.isNotEmpty) await _familyRef.update(updates);
-      if (kid.classroomEmail != result.email ||
-          !listEquals(kid.classroomClasses, result.classNames)) {
+      if (!isParent) {
+        // A child's own device keeps what it imports in the child's own
+        // document; Mom sees it too.
+        await _familyRef.collection('kidSchool').doc(kid.id).set({
+          'items': updates,
+          'email': result.email,
+          'classes': result.classNames,
+          'updatedAt': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+      } else if (updates.isNotEmpty) {
+        await _familyRef.update({
+          for (final e in updates.entries)
+            FieldPath(['schoolItems', e.key]): e.value,
+        });
+      }
+      if (isParent &&
+          (kid.classroomEmail != result.email ||
+              !listEquals(kid.classroomClasses, result.classNames))) {
         kid.classroomEmail = result.email;
         kid.classroomClasses = result.classNames;
         saveKid(kid);
@@ -1198,6 +1292,17 @@ class AppStore extends ChangeNotifier {
   Future<void> _dailyClassroomSync() async {
     if (!classroomEnabled || !ClassroomClient.supported) return;
     for (final kid in family.kids.where((k) => k.classroomEmail != null)) {
+      await syncClassroom(kid, interactive: false);
+    }
+  }
+
+  /// Once a day on a child's device: refresh Classroom for children who
+  /// connected their school account here.
+  Future<void> _deviceClassroomSync() async {
+    if (!classroomEnabled || !ClassroomClient.supported) return;
+    for (final kid in visibleKids.where(
+      (k) => k.mayConnectClassroom && k.selfClassroomEmail != null,
+    )) {
       await syncClassroom(kid, interactive: false);
     }
   }

@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 
+import 'content.dart';
 import 'firebase_options.dart';
 import 'screens/kid_screen.dart';
 import 'screens/setup_screen.dart';
@@ -44,6 +45,36 @@ ThemeData buildTheme(Color seed, Brightness brightness) => ThemeData(
   useMaterial3: true,
   cardTheme: const CardThemeData(elevation: 0),
 );
+
+/// A child's screens: their theme's colours, a soft background and rounded
+/// white cards.
+ThemeData buildKidTheme(KidTheme t, Brightness brightness) {
+  final base = buildTheme(t.color, brightness);
+  final light = brightness == Brightness.light;
+  final cs = base.colorScheme.copyWith(
+    primary: light ? t.color : null,
+    secondary: t.accent,
+  );
+  return base.copyWith(
+    colorScheme: cs,
+    scaffoldBackgroundColor: light ? t.background : cs.surface,
+    cardTheme: CardThemeData(
+      elevation: light ? 1.5 : 0,
+      shadowColor: t.color.withValues(alpha: 0.18),
+      color: light ? Colors.white : cs.surfaceContainer,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(22),
+        side: BorderSide(color: t.color.withValues(alpha: 0.10)),
+      ),
+    ),
+    filledButtonTheme: FilledButtonThemeData(
+      style: FilledButton.styleFrom(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+      ),
+    ),
+  );
+}
 
 class SuperMomApp extends StatelessWidget {
   const SuperMomApp({super.key, required this.store});

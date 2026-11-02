@@ -155,6 +155,7 @@ class Kid {
     this.ayahDone = 0,
     this.ayahTotal = 4,
     this.classroomEmail,
+    this.classroomSelf,
     List<Reward>? rewards,
     this.wishIndex,
     Map<String, DoneBy>? checks,
@@ -179,6 +180,16 @@ class Kid {
 
   /// Names of the Classroom classes found with that account.
   List<String> classroomClasses = [];
+
+  /// Mom's choice: may this child connect Google Classroom on their own
+  /// device? Unset means yes from age 10.
+  bool? classroomSelf;
+  bool get mayConnectClassroom => classroomSelf ?? age >= 10;
+
+  /// The account the child connected on their own device, and its classes
+  /// (from families/{fid}/kidSchool/{id}; not part of the profile).
+  String? selfClassroomEmail;
+  List<String> selfClassroomClasses = [];
 
   List<Reward> rewards;
   int? wishIndex;
@@ -207,6 +218,7 @@ class Kid {
     rewards = o.rewards;
     classroomEmail = o.classroomEmail;
     classroomClasses = o.classroomClasses;
+    classroomSelf = o.classroomSelf;
   }
 
   /// The fields that stay from week to week (families/{fid}/kids/{id}).
@@ -234,6 +246,7 @@ class Kid {
     'ayahTotal': ayahTotal,
     'classroomEmail': classroomEmail,
     'classroomClasses': classroomClasses,
+    if (classroomSelf != null) 'classroomSelf': classroomSelf,
     'rewards': rewards.map((r) => r.toJson()).toList(),
     'wishIndex': wishIndex,
     'checks': checks.map((k, v) => MapEntry(k, v.name)),
@@ -251,6 +264,7 @@ class Kid {
           ayahDone: j['ayahDone'] as int? ?? 0,
           ayahTotal: j['ayahTotal'] as int? ?? 1,
           classroomEmail: j['classroomEmail'] as String?,
+          classroomSelf: j['classroomSelf'] as bool?,
           rewards: ((j['rewards'] as List?) ?? [])
               .map((e) => Reward.fromJson(asMap(e)))
               .toList(),
@@ -504,7 +518,11 @@ class FamilyData {
     // from loading, so items that cannot be read are skipped.
     schoolItems: [
       for (final e in ((j['schoolItems'] as Map?) ?? {}).values)
-        ?_tryParse(() => SchoolItem.fromJson(asMap(e))),
+        ?tryParseSchoolItem(e),
     ],
   );
 }
+
+/// Reads one stored school item, or null when it is damaged.
+SchoolItem? tryParseSchoolItem(Object? e) =>
+    _tryParse(() => SchoolItem.fromJson(asMap(e)));
