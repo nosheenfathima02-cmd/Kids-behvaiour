@@ -349,14 +349,44 @@ SchoolItem? datedItemFromNotice(ClassroomNotice n, String kidId, DateTime now) {
   );
 }
 
+/// One Google Classroom class, e.g. "Grade 3".
+class ClassroomCourse {
+  const ClassroomCourse(this.id, this.name);
+  final String id;
+  final String name;
+}
+
+/// Lets the person connecting pick which classes to read (one account can be
+/// in several grades). Returns null when they cancel.
+typedef ChooseCourses = Future<Set<String>?> Function(
+  List<ClassroomCourse> courses,
+  Set<String> selected,
+);
+
+/// Picks the classes to read: the saved choice (only classes that still
+/// exist), or every class when nothing was chosen yet.
+Set<String> coursesToRead(List<ClassroomCourse> all, Set<String> saved) {
+  final ids = {for (final c in all) c.id};
+  final keep = saved.intersection(ids);
+  return keep.isEmpty ? ids : keep;
+}
+
 class ClassroomResult {
   ClassroomResult(
     this.email,
     this.work,
     this.notices, [
     this.classNames = const [],
+    this.courseIds = const [],
+    this.allClassNames = const [],
   ]);
   final String email;
+
+  /// Ids of the classes that were read (the ones chosen).
+  final List<String> courseIds;
+
+  /// Every class the account is in, chosen or not.
+  final List<String> allClassNames;
 
   /// The Classroom classes found for this account, e.g. ["Grade 3"].
   final List<String> classNames;
@@ -436,6 +466,8 @@ class ClassroomClient {
     DateTime now, {
     bool interactive = true,
     String? expectedEmail,
+    Set<String> savedCourses = const {},
+    ChooseCourses? choose,
   }) async {
     if (!supported) {
       throw ClassroomException('Google Classroom works in the phone app.');
@@ -454,7 +486,7 @@ class ClassroomClient {
         classroomScopes,
       );
       if (quietAuth == null) return null;
-      return _read(now, quiet.email, quietAuth.accessToken);
+      return _read(now, quiet.email, quietAuth.accessToken, savedCourses);
     }
     try {
       // Always show the account picker: each child has their own school account.
@@ -473,14 +505,16 @@ class ClassroomClient {
           classroomScopes,
         ) ??
         await account.authorizationClient.authorizeScopes(classroomScopes);
-    return _read(now, account.email, auth.accessToken);
+    return _read(now, account.email, auth.accessToken, savedCourses, choose);
   }
 
   static Future<ClassroomResult> _read(
     DateTime now,
     String email,
     String token,
-  ) async {
+    Set<String> savedCourses, [
+    ChooseCourses? choose,
+  ]) async {
     final headers = {'Authorization': 'Bearer $token'};
 
     Future<Map<String, dynamic>> get(
@@ -511,9 +545,21 @@ class ClassroomClient {
         courses[course['id'] as String] = course;
       }
     }
+    final all = [
+      for (final c in courses.values)
+        ClassroomCourse(c['id'] as String, (c['name'] as String?) ?? 'Class'),
+    ];
+    var selected = coursesToRead(all, savedCourses);
+    if (choose != null && all.length > 1) {
+      final picked = await choose(all, selected);
+      if (picked == null) throw ClassroomException('No classes were chosen.');
+      if (picked.isNotEmpty) selected = picked;
+    }
     final work = <ClassroomWork>[];
     final notices = <ClassroomNotice>[];
-    for (final course in courses.values) {
+    for (final course in courses.values.where(
+      (c) => selected.contains(c['id']),
+    )) {
       final id = course['id'] as String;
       final announcements = await get('/v1/courses/$id/announcements', {
         'announcementStates': 'PUBLISHED',
@@ -568,8 +614,19 @@ class ClassroomClient {
         ),
       );
     }
-    return ClassroomResult(email, work, notices, [
-      for (final c in courses.values) (c['name'] as String?) ?? 'Class',
-    ]);
+    return ClassroomResult(
+      email,
+      work,
+      notices,
+      [
+        for (final c in all)
+          if (selected.contains(c.id)) c.name,
+      ],
+      [
+        for (final c in all)
+          if (selected.contains(c.id)) c.id,
+      ],
+      [for (final c in all) c.name],
+    );
   }
 }

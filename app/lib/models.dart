@@ -184,6 +184,12 @@ class Kid {
   /// Mom's choice: may this child connect Google Classroom on their own
   /// device? Unset means yes from age 10.
   bool? classroomSelf;
+
+  /// The Classroom classes Mom chose to read (empty: all of them).
+  List<String> classroomCourseIds = [];
+
+  /// The classes chosen on the child's own device.
+  List<String> selfClassroomCourseIds = [];
   bool get mayConnectClassroom => classroomSelf ?? age >= 10;
 
   /// The account the child connected on their own device, and its classes
@@ -219,6 +225,7 @@ class Kid {
     classroomEmail = o.classroomEmail;
     classroomClasses = o.classroomClasses;
     classroomSelf = o.classroomSelf;
+    classroomCourseIds = o.classroomCourseIds;
   }
 
   /// The fields that stay from week to week (families/{fid}/kids/{id}).
@@ -247,6 +254,7 @@ class Kid {
     'classroomEmail': classroomEmail,
     'classroomClasses': classroomClasses,
     if (classroomSelf != null) 'classroomSelf': classroomSelf,
+    if (classroomCourseIds.isNotEmpty) 'classroomCourseIds': classroomCourseIds,
     'rewards': rewards.map((r) => r.toJson()).toList(),
     'wishIndex': wishIndex,
     'checks': checks.map((k, v) => MapEntry(k, v.name)),
@@ -281,6 +289,9 @@ class Kid {
         )
         ..classroomClasses = [
           for (final c in (j['classroomClasses'] as List?) ?? const []) '$c',
+        ]
+        ..classroomCourseIds = [
+          for (final c in (j['classroomCourseIds'] as List?) ?? const []) '$c',
         ];
 }
 

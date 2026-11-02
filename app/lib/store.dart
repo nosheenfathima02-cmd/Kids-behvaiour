@@ -844,6 +844,9 @@ class AppStore extends ChangeNotifier {
       kid.selfClassroomClasses = [
         for (final c in (doc?['classes'] as List?) ?? const []) '$c',
       ];
+      kid.selfClassroomCourseIds = [
+        for (final c in (doc?['courseIds'] as List?) ?? const []) '$c',
+      ];
       for (final e in ((doc?['items'] as Map?) ?? const {}).values) {
         final item = tryParseSchoolItem(e);
         if (item == null || item.kidId != kid.id || have.contains(item.id)) {
@@ -1218,11 +1221,19 @@ class AppStore extends ChangeNotifier {
   /// Imports a child's upcoming Google Classroom homework and tests, and
   /// their teachers' recent announcements. Returns a message for the parent,
   /// or null when a background sync could not run without asking.
-  Future<String?> syncClassroom(Kid kid, {bool interactive = true}) async {
+  Future<String?> syncClassroom(
+    Kid kid, {
+    bool interactive = true,
+    ChooseCourses? choose,
+  }) async {
     try {
       final result = await ClassroomClient.fetch(
         now,
         interactive: interactive,
+        savedCourses: {
+          ...(isParent ? kid.classroomCourseIds : kid.selfClassroomCourseIds),
+        },
+        choose: interactive ? choose : null,
         expectedEmail: interactive
             ? null
             : (isParent ? kid.classroomEmail : kid.selfClassroomEmail),
@@ -1251,6 +1262,17 @@ class AppStore extends ChangeNotifier {
           added++;
         }
       }
+      // Classes that were not chosen: remove what was imported from them before.
+      final unchosen = result.allClassNames.toSet()
+        ..removeAll(result.classNames);
+      for (final i in family.schoolItems) {
+        if (i.kidId == kid.id &&
+            i.source == 'classroom' &&
+            unchosen.contains(i.subject) &&
+            _kidSchoolIds.contains(i.id) != isParent) {
+          updates[i.id] = FieldValue.delete();
+        }
+      }
       if (!isParent) {
         // A child's own device keeps what it imports in the child's own
         // document; Mom sees it too.
@@ -1258,6 +1280,7 @@ class AppStore extends ChangeNotifier {
           'items': updates,
           'email': result.email,
           'classes': result.classNames,
+          'courseIds': result.courseIds,
           'updatedAt': FieldValue.serverTimestamp(),
         }, SetOptions(merge: true));
       } else if (updates.isNotEmpty) {
@@ -1268,9 +1291,11 @@ class AppStore extends ChangeNotifier {
       }
       if (isParent &&
           (kid.classroomEmail != result.email ||
-              !listEquals(kid.classroomClasses, result.classNames))) {
+              !listEquals(kid.classroomClasses, result.classNames) ||
+              !listEquals(kid.classroomCourseIds, result.courseIds))) {
         kid.classroomEmail = result.email;
         kid.classroomClasses = result.classNames;
+        kid.classroomCourseIds = result.courseIds;
         saveKid(kid);
       }
       if (result.classNames.isEmpty) {

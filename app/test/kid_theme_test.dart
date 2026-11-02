@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:super_mom/classroom.dart';
 import 'package:super_mom/content.dart';
 import 'package:super_mom/models.dart';
 
@@ -53,4 +54,23 @@ void main() {
       }
     },
   );
+
+  test('only the chosen Classroom classes are read', () {
+    const all = [
+      ClassroomCourse('g3', 'Grade 3'),
+      ClassroomCourse('g5', 'Grade 5'),
+      ClassroomCourse('g6', 'Grade 6'),
+    ];
+    expect(coursesToRead(all, {}), {'g3', 'g5', 'g6'});
+    expect(coursesToRead(all, {'g5'}), {'g5'});
+    // A class that ended is ignored; if none are left, read them all.
+    expect(coursesToRead(all, {'g5', 'old'}), {'g5'});
+    expect(coursesToRead(all, {'old'}), {'g3', 'g5', 'g6'});
+  });
+
+  test("Mom's chosen classes are saved with the child's profile", () {
+    final k = Kid(id: 'a', name: 'Aisha', age: 11)..classroomCourseIds = ['g5'];
+    final back = Kid.fromJson({...k.profileJson(), 'id': 'a'});
+    expect(back.classroomCourseIds, ['g5']);
+  });
 }

@@ -298,6 +298,11 @@ describe("a child's own Google Classroom import", () => {
     await assertFails(tick(db, 's_cwClosed'));
   });
 
+  test('the chosen classes are saved with the import', async () => {
+    await assertSucceeds(setDoc(kidSchool(aishaTablet()), { ...imported({}), courseIds: ['g5'] }));
+    await assertFails(setDoc(kidSchool(aishaTablet()), { ...imported({}), courseIds: 'g5' }));
+  });
+
   test("a child cannot write a brother's import or extra fields", async () => {
     await assertFails(setDoc(kidSchool(aishaTablet(), 'yusuf'), imported({})));
     await assertFails(setDoc(kidSchool(aishaTablet()), { ...imported({}), stars: 10 }));

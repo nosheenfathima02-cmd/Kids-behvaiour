@@ -98,9 +98,17 @@ class SchoolTab extends StatefulWidget {
 class _SchoolTabState extends State<SchoolTab> {
   bool _syncing = false;
 
-  Future<void> _sync(AppStore store) async {
+  Future<void> _sync(AppStore store, {bool chooseAgain = false}) async {
     setState(() => _syncing = true);
-    final msg = await store.syncClassroom(widget.kid);
+    final saved = store.isParent
+        ? widget.kid.classroomCourseIds
+        : widget.kid.selfClassroomCourseIds;
+    final msg = await store.syncClassroom(
+      widget.kid,
+      choose: chooseAgain || saved.isEmpty
+          ? classPicker(context, widget.kid.name)
+          : null,
+    );
     if (!mounted) return;
     setState(() => _syncing = false);
     if (msg != null) {
@@ -163,6 +171,14 @@ class _SchoolTabState extends State<SchoolTab> {
                           ? 'Connect school account'
                           : 'Sync now',
                     ),
+                  ),
+                if (ClassroomClient.supported && kid.classroomEmail != null)
+                  TextButton.icon(
+                    onPressed: _syncing
+                        ? null
+                        : () => _sync(store, chooseAgain: true),
+                    icon: const Icon(Icons.checklist),
+                    label: const Text('Choose classes / grade'),
                   )
                 else
                   const Text(
@@ -790,9 +806,17 @@ class KidClassroomCard extends StatefulWidget {
 class _KidClassroomCardState extends State<KidClassroomCard> {
   bool _syncing = false;
 
-  Future<void> _sync(AppStore store) async {
+  Future<void> _sync(AppStore store, {bool chooseAgain = false}) async {
     setState(() => _syncing = true);
-    final msg = await store.syncClassroom(widget.kid);
+    final saved = store.isParent
+        ? widget.kid.classroomCourseIds
+        : widget.kid.selfClassroomCourseIds;
+    final msg = await store.syncClassroom(
+      widget.kid,
+      choose: chooseAgain || saved.isEmpty
+          ? classPicker(context, widget.kid.name)
+          : null,
+    );
     if (!mounted) return;
     setState(() => _syncing = false);
     if (msg != null) {
@@ -834,9 +858,72 @@ class _KidClassroomCardState extends State<KidClassroomCard> {
                 email == null ? 'Connect my school account' : 'Check now',
               ),
             ),
+            if (email != null)
+              TextButton.icon(
+                onPressed: _syncing
+                    ? null
+                    : () => _sync(store, chooseAgain: true),
+                icon: const Icon(Icons.checklist),
+                label: const Text('Choose my classes'),
+              ),
           ],
         ),
       ),
     );
   }
 }
+
+/// Asks which Classroom classes to read for a child: one school account can
+/// be in several grades, and only the child's own should come in.
+ChooseCourses classPicker(BuildContext context, String kidName) =>
+    (courses, selected) => showDialog<Set<String>>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) {
+        final picked = {...selected};
+        return StatefulBuilder(
+          builder: (ctx, setState) => AlertDialog(
+            icon: const Icon(Icons.school_outlined),
+            title: Text(
+              kidName.isEmpty
+                  ? 'Which classes?'
+                  : "Which are $kidName's classes?",
+            ),
+            content: SizedBox(
+              width: 400,
+              child: ListView(
+                shrinkWrap: true,
+                children: [
+                  const Text(
+                    'This account is in more than one class. Tick only the ones to bring into Super Mom.',
+                  ),
+                  const SizedBox(height: 8),
+                  for (final c in courses)
+                    CheckboxListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: Text(c.name),
+                      value: picked.contains(c.id),
+                      onChanged: (v) => setState(
+                        () =>
+                            v == true ? picked.add(c.id) : picked.remove(c.id),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                onPressed: picked.isEmpty
+                    ? null
+                    : () => Navigator.pop(ctx, picked),
+                child: const Text('Use these classes'),
+              ),
+            ],
+          ),
+        );
+      },
+    );
