@@ -31,6 +31,7 @@ Map<String, dynamic> response(int number, List<String> texts) => {
 };
 
 void main() {
+  memorisingTests();
   test(
     'reads text and Al-Husary audio, and moves the Bismillah to a heading',
     () {
@@ -84,5 +85,79 @@ void main() {
     expect(back.ayahs.first.text, surah.ayahs.first.text);
     expect(back.bismillah, surah.bismillah);
     expect(back.info.ayahCount, 1);
+  });
+}
+
+const ayatAlKursi =
+    'ٱللَّهُ لَآ إِلَٰهَ إِلَّا هُوَ ٱلْحَىُّ ٱلْقَيُّومُ ۚ لَا تَأْخُذُهُۥ سِنَةٌ وَلَا نَوْمٌ ۚ '
+    'لَّهُۥ مَا فِى ٱلسَّمَٰوَٰتِ وَمَا فِى ٱلْأَرْضِ ۗ مَن ذَا ٱلَّذِى يَشْفَعُ عِندَهُۥٓ إِلَّا بِإِذْنِهِۦ ۚ '
+    'يَعْلَمُ مَا بَيْنَ أَيْدِيهِمْ وَمَا خَلْفَهُمْ ۖ وَلَا يُحِيطُونَ بِشَىْءٍ مِّنْ عِلْمِهِۦٓ إِلَّا بِمَا شَآءَ ۚ '
+    'وَسِعَ كُرْسِيُّهُ ٱلسَّمَٰوَٰتِ وَٱلْأَرْضَ ۖ وَلَا يَـُٔودُهُۥ حِفْظُهُمَا ۚ وَهُوَ ٱلْعَلِىُّ ٱلْعَظِيمُ';
+
+void memorisingTests() {
+  test('a long ayah is split at its pause marks into short parts', () {
+    final parts = ayahParts(ayatAlKursi);
+    expect(parts.length, greaterThanOrEqualTo(6));
+    expect(parts.first, startsWith('ٱللَّهُ لَآ إِلَٰهَ'));
+    expect(parts.first, endsWith('ٱلْقَيُّومُ ۚ'));
+    for (final p in parts) {
+      expect(
+        p.split(' ').where((w) => w.length > 1).length,
+        inInclusiveRange(3, 10),
+      );
+    }
+    // Nothing is lost.
+    expect(
+      parts.join(' ').replaceAll(' ', ''),
+      ayatAlKursi.replaceAll(' ', ''),
+    );
+  });
+
+  test('a short ayah stays whole', () {
+    expect(ayahParts('إِنَّ ٱلْإِنسَٰنَ لَفِى خُسْرٍ'), [
+      'إِنَّ ٱلْإِنسَٰنَ لَفِى خُسْرٍ',
+    ]);
+  });
+
+  test("the Qur'an's spelling and plain Arabic compare", () {
+    expect(normalizeArabic('ٱلرَّحْمَٰنِ'), 'الرحمان');
+    expect(normalizeArabic('ٱلْحَىُّ'), 'الحي');
+    expect(normalizeArabic('لَا تَأْخُذُهُۥ'), 'لا تاخذه');
+  });
+
+  test('a correct recitation passes, even with small spelling differences', () {
+    final c = checkRecitation(
+      'ٱللَّهُ لَآ إِلَٰهَ إِلَّا هُوَ ٱلْحَىُّ ٱلْقَيُّومُ ۚ',
+      'الله لا إله إلا هو الحي القيوم',
+    );
+    expect(c.correct, everyElement(isTrue));
+    expect(c.words.length, 7);
+    expect(c.passed, isTrue);
+  });
+
+  test('missed words are marked, and too many misses do not pass', () {
+    final c = checkRecitation(
+      'ٱللَّهُ لَآ إِلَٰهَ إِلَّا هُوَ ٱلْحَىُّ ٱلْقَيُّومُ ۚ',
+      'الله لا اله الحي',
+    );
+    expect(c.correct, [true, true, true, false, false, true, false]);
+    expect(c.passed, isFalse);
+    expect(checkRecitation('وَٱلْعَصْرِ', '').passed, isFalse);
+  });
+
+  test('the meaning in English is read with the ayah and cached', () {
+    final body = response(103, [
+      'بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ وَٱلْعَصْرِ',
+    ]);
+    (body['data'] as List).add({
+      'number': 103,
+      'edition': {'identifier': 'en.sahih'},
+      'ayahs': [
+        {'number': 6200, 'text': 'By time,', 'numberInSurah': 1},
+      ],
+    });
+    final surah = parseSurahResponse(body);
+    expect(surah.ayahs.first.translation, 'By time,');
+    expect(Surah.fromJson(surah.toJson()).ayahs.first.translation, 'By time,');
   });
 }

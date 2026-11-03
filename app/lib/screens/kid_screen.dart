@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../classroom.dart';
 import '../content.dart';
+import 'ramadan_tab.dart';
 import '../logic.dart';
 
 import 'package:just_audio/just_audio.dart';
@@ -171,74 +172,337 @@ class KidAvatar extends StatelessWidget {
   }
 }
 
-class KidHome extends StatelessWidget {
+class KidHome extends StatefulWidget {
   const KidHome({super.key, required this.kid});
   final Kid kid;
 
   @override
+  State<KidHome> createState() => _KidHomeState();
+}
+
+/// A child's app: five tabs along the bottom.
+class _KidHomeState extends State<KidHome> {
+  int _tab = 0;
+
+  @override
   Widget build(BuildContext context) {
     final store = StoreScope.of(context);
+    final kid = widget.kid;
     final t = themeOf(kid);
     final brightness = Theme.of(context).brightness;
+    final hasSchool =
+        store.schoolItemsFor(kid).isNotEmpty ||
+        store.noticesFor(kid).isNotEmpty;
     return Theme(
       data: buildKidTheme(t, brightness),
       child: Builder(
         builder: (context) {
+          final tabs = <Widget>[
+            _DayTab(kid: kid, store: store),
+            _PrayerTab(kid: kid, store: store),
+            _QuranTab(kid: kid),
+            _SchoolTab(kid: kid, store: store),
+            RamadanTab(kid: kid, store: store),
+          ];
           return Scaffold(
-            body: ListView(
-              padding: EdgeInsets.zero,
-              children: [
-                _Hero(kid: kid, store: store),
-                Center(
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 560),
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          if (kid.examMode) ...[
-                            const _Banner(
-                              "📖 Exam week! Only salah, Qur'an and study today. You can do it, in sha Allah.",
-                            ),
-                            const SizedBox(height: 12),
-                          ],
-                          if (store.isWeekend) ...[
-                            _Banner(
-                              '🎉 It\'s the weekend! You earned ${store.score(kid).total} stars this week. '
-                              'A new week starts on Monday.',
-                            ),
-                            const SizedBox(height: 12),
-                          ],
-                          _StarsCard(kid: kid, store: store),
-                          const SizedBox(height: 12),
-                          _PrayerCard(store: store),
-                          if (!store.isWeekend) ...[
-                            const SizedBox(height: 12),
-                            _JobsCard(kid: kid, store: store),
-                            if (kid.examMode) const FocusTimerCard(),
-                          ],
-                          KidSchoolCard(kid: kid),
-                          // On the child's own device (not Mom's phone in kids mode).
-                          if (!store.isParent &&
-                              classroomEnabled &&
-                              ClassroomClient.supported &&
-                              kid.mayConnectClassroom)
-                            KidClassroomCard(kid: kid),
-                          const SizedBox(height: 12),
-                          _QuranCard(kid: kid),
-                          const SizedBox(height: 12),
-                          _RewardsCard(kid: kid, store: store),
-                        ],
-                      ),
-                    ),
+            body: IndexedStack(index: _tab, children: tabs),
+            bottomNavigationBar: NavigationBar(
+              selectedIndex: _tab,
+              onDestinationSelected: (i) => setState(() => _tab = i),
+              labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
+              destinations: [
+                const NavigationDestination(
+                  icon: Icon(Icons.checklist_rounded),
+                  label: 'My day',
+                ),
+                const NavigationDestination(
+                  icon: Icon(Icons.mosque_outlined),
+                  selectedIcon: Icon(Icons.mosque),
+                  label: 'Prayer',
+                ),
+                const NavigationDestination(
+                  icon: Icon(Icons.menu_book_outlined),
+                  selectedIcon: Icon(Icons.menu_book),
+                  label: "Qur'an",
+                ),
+                NavigationDestination(
+                  icon: Badge(
+                    isLabelVisible: hasSchool,
+                    smallSize: 8,
+                    child: const Icon(Icons.school_outlined),
                   ),
+                  selectedIcon: const Icon(Icons.school),
+                  label: 'School',
+                ),
+                const NavigationDestination(
+                  icon: Icon(Icons.nightlight_outlined),
+                  selectedIcon: Icon(Icons.nightlight),
+                  label: 'Ramadan',
                 ),
               ],
             ),
           );
         },
       ),
+    );
+  }
+}
+
+/// A scrolling tab page, centred on wide screens.
+class KidTabPage extends StatelessWidget {
+  const KidTabPage({super.key, required this.header, required this.children});
+  final Widget header;
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) => ListView(
+    padding: EdgeInsets.zero,
+    children: [
+      header,
+      Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 560),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: children,
+            ),
+          ),
+        ),
+      ),
+    ],
+  );
+}
+
+/// The smaller coloured header of the other tabs.
+class KidTabHeader extends StatelessWidget {
+  const KidTabHeader({
+    super.key,
+    required this.kid,
+    required this.title,
+    this.subtitle,
+  });
+  final Kid kid;
+  final String title;
+  final String? subtitle;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = themeOf(kid);
+    final canPop = Navigator.of(context).canPop();
+    return Container(
+      decoration: BoxDecoration(
+        gradient: t.gradient,
+        borderRadius: const BorderRadius.vertical(bottom: Radius.circular(28)),
+      ),
+      child: SafeArea(
+        bottom: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(8, 4, 8, 18),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (canPop)
+                const BackButton(color: Colors.white)
+              else
+                const SizedBox(width: 12),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 10),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 24,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      if (subtitle != null)
+                        Text(
+                          subtitle!,
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.9),
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+              IconButton(
+                tooltip: 'Parent',
+                color: Colors.white,
+                icon: const Icon(Icons.lock_outline),
+                onPressed: () => openParentArea(context),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+bool _isSalah(RoutineTask t) => t.category == TaskCategory.salah;
+
+class _DayTab extends StatelessWidget {
+  const _DayTab({required this.kid, required this.store});
+  final Kid kid;
+  final AppStore store;
+
+  @override
+  Widget build(BuildContext context) => KidTabPage(
+    header: _Hero(kid: kid, store: store),
+    children: [
+      if (kid.examMode) ...[
+        const _Banner(
+          "📖 Exam week! Only salah, Qur'an and study today. You can do it, in sha Allah.",
+        ),
+        const SizedBox(height: 12),
+      ],
+      if (store.isWeekend) ...[
+        _Banner(
+          "🎉 It's the weekend! You earned ${store.score(kid).total} stars this week. "
+          'A new week starts on Monday.',
+        ),
+        const SizedBox(height: 12),
+      ],
+      _StarsCard(kid: kid, store: store),
+      if (!store.isWeekend) ...[
+        const SizedBox(height: 12),
+        _JobsCard(
+          kid: kid,
+          store: store,
+          title: 'My jobs & chores today',
+          where: (t) => !_isSalah(t),
+        ),
+      ],
+      const SizedBox(height: 12),
+      _RewardsCard(kid: kid, store: store),
+    ],
+  );
+}
+
+class _PrayerTab extends StatelessWidget {
+  const _PrayerTab({required this.kid, required this.store});
+  final Kid kid;
+  final AppStore store;
+
+  @override
+  Widget build(BuildContext context) => KidTabPage(
+    header: KidTabHeader(
+      kid: kid,
+      title: 'My salah 🕌',
+      subtitle: 'Hayya ʿalaṣ-ṣalāh, come to prayer!',
+    ),
+    children: [
+      _PrayerCard(store: store),
+      if (!store.isWeekend) ...[
+        const SizedBox(height: 12),
+        _JobsCard(
+          kid: kid,
+          store: store,
+          title: 'Tick each prayer when you pray it',
+          where: _isSalah,
+        ),
+      ],
+    ],
+  );
+}
+
+class _QuranTab extends StatelessWidget {
+  const _QuranTab({required this.kid});
+  final Kid kid;
+
+  @override
+  Widget build(BuildContext context) {
+    final surah = surahNumberFrom(kid.surahName);
+    return KidTabPage(
+      header: KidTabHeader(
+        kid: kid,
+        title: "My Qur'an 📖",
+        subtitle: 'Listen, repeat and recite',
+      ),
+      children: [
+        _QuranCard(kid: kid),
+        const SizedBox(height: 12),
+        FutureBuilder<Set<String>>(
+          future: QuranProgress.load(),
+          builder: (context, snap) {
+            final passed = snap.data ?? const <String>{};
+            final mine = surah == null
+                ? 0
+                : QuranProgress.countFor(passed, surah);
+            return SectionCard(
+              title: 'Recited correctly',
+              trailing: Text(
+                '${passed.length} ayat',
+                style: const TextStyle(fontWeight: FontWeight.w800),
+              ),
+              child: Text(
+                surah == null
+                    ? 'Recite to the microphone in "Check me" and every ayah you get right is counted here.'
+                    : '$mine ayat of ${kid.surahName} recited correctly with the microphone check. '
+                          'Keep going, every letter is a reward!',
+              ),
+            );
+          },
+        ),
+        const SizedBox(height: 12),
+        const SectionCard(
+          title: 'How to memorise',
+          child: Text(
+            '1. Listen to Sheikh Al-Husary.\n'
+            '2. Recite back to the microphone. Long ayat come in small parts.\n'
+            '3. Green words are right, red words need another go.\n'
+            '4. Read the meaning so you know what you are learning.\n'
+            '5. Hide the text and test yourself.',
+            style: TextStyle(height: 1.5),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _SchoolTab extends StatelessWidget {
+  const _SchoolTab({required this.kid, required this.store});
+  final Kid kid;
+  final AppStore store;
+
+  @override
+  Widget build(BuildContext context) {
+    final empty =
+        store.schoolItemsFor(kid).isEmpty &&
+        store.noticesFor(kid).isEmpty &&
+        store.schoolWorkLeftToday(kid).isEmpty;
+    return KidTabPage(
+      header: KidTabHeader(
+        kid: kid,
+        title: 'My school 🎒',
+        subtitle: 'Homework, tests and news from your teacher',
+      ),
+      children: [
+        if (empty)
+          const SectionCard(
+            title: 'All clear!',
+            child: Text(
+              'No homework, tests or announcements right now. Well done! 🌟',
+            ),
+          ),
+        if (kid.examMode) const FocusTimerCard(),
+        KidSchoolCard(kid: kid),
+        // On the child's own device (not Mom's phone in kids mode).
+        if (!store.isParent &&
+            classroomEnabled &&
+            ClassroomClient.supported &&
+            kid.mayConnectClassroom)
+          KidClassroomCard(kid: kid),
+      ],
     );
   }
 }
@@ -521,16 +785,26 @@ class _PrayerCard extends StatelessWidget {
 }
 
 class _JobsCard extends StatelessWidget {
-  const _JobsCard({required this.kid, required this.store});
+  const _JobsCard({
+    required this.kid,
+    required this.store,
+    this.title = 'My jobs today',
+    this.where,
+  });
   final Kid kid;
   final AppStore store;
+  final String title;
+  final bool Function(RoutineTask t)? where;
 
   @override
   Widget build(BuildContext context) {
     final day = store.todayWeekday;
-    final tasks = store.tasksForDay(kid, day);
+    final tasks = store
+        .tasksForDay(kid, day)
+        .where(where ?? (_) => true)
+        .toList();
     return SectionCard(
-      title: 'My jobs today',
+      title: title,
       trailing: const Text('Mom can see your ticks'),
       child: Column(
         children: [
@@ -632,8 +906,12 @@ class _QuranCard extends StatelessWidget {
             onPressed: () => Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (_) => QuranScreen(
-                  initialSurah: surahNumberFrom(kid.surahName) ?? 1,
+                // Keeps the child's theme colours.
+                builder: (_) => Theme(
+                  data: Theme.of(context),
+                  child: QuranScreen(
+                    initialSurah: surahNumberFrom(kid.surahName) ?? 1,
+                  ),
                 ),
               ),
             ),
