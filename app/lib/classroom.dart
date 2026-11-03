@@ -474,6 +474,29 @@ class ClassroomClient {
     }
     final signIn = await googleSignIn();
     final GoogleSignInAccount account;
+    // "Sync now" for an account that is still signed in: no account picker.
+    if (interactive && expectedEmail != null) {
+      try {
+        final quiet = await signIn.attemptLightweightAuthentication(
+          reportAllExceptions: false,
+        );
+        if (quiet != null && quiet.email == expectedEmail) {
+          final quietAuth = await quiet.authorizationClient
+              .authorizationForScopes(classroomScopes);
+          if (quietAuth != null) {
+            return await _read(
+              now,
+              quiet.email,
+              quietAuth.accessToken,
+              savedCourses,
+              choose,
+            );
+          }
+        }
+      } on GoogleSignInException {
+        // Fall back to the account picker below.
+      }
+    }
     if (!interactive) {
       final quiet = await signIn.attemptLightweightAuthentication(
         reportAllExceptions: false,

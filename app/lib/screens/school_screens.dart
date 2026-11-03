@@ -98,14 +98,19 @@ class SchoolTab extends StatefulWidget {
 class _SchoolTabState extends State<SchoolTab> {
   bool _syncing = false;
 
-  Future<void> _sync(AppStore store, {bool chooseAgain = false}) async {
+  Future<void> _sync(
+    AppStore store, {
+    bool chooseAgain = false,
+    bool otherAccount = false,
+  }) async {
     setState(() => _syncing = true);
     final saved = store.isParent
         ? widget.kid.classroomCourseIds
         : widget.kid.selfClassroomCourseIds;
     final msg = await store.syncClassroom(
       widget.kid,
-      choose: chooseAgain || saved.isEmpty
+      otherAccount: otherAccount,
+      choose: chooseAgain || otherAccount || saved.isEmpty
           ? classPicker(context, widget.kid.name)
           : null,
     );
@@ -145,7 +150,8 @@ class _SchoolTabState extends State<SchoolTab> {
                             "Sign in with the school Google account ${kid.name} uses in Classroom; Super Mom only reads."
                       : 'Connected: ${kid.classroomEmail}\n'
                             '${kid.classroomClasses.isEmpty ? 'No classes found for this account.' : 'Classes: ${kid.classroomClasses.join(', ')}'}\n'
-                            'Checks by itself once a day, or tap Sync now.',
+                            'Checks by itself every 2 hours while the app is open. '
+                            '${lastCheckedText(store.lastClassroomSync(kid), store.now)}',
                 ),
                 if (kid.selfClassroomEmail != null) ...[
                   const SizedBox(height: 8),
@@ -179,6 +185,14 @@ class _SchoolTabState extends State<SchoolTab> {
                         : () => _sync(store, chooseAgain: true),
                     icon: const Icon(Icons.checklist),
                     label: const Text('Choose classes / grade'),
+                  ),
+                if (ClassroomClient.supported && kid.classroomEmail != null)
+                  TextButton.icon(
+                    onPressed: _syncing
+                        ? null
+                        : () => _sync(store, otherAccount: true),
+                    icon: const Icon(Icons.switch_account_outlined),
+                    label: const Text('Use a different account'),
                   )
                 else
                   const Text(
@@ -806,14 +820,19 @@ class KidClassroomCard extends StatefulWidget {
 class _KidClassroomCardState extends State<KidClassroomCard> {
   bool _syncing = false;
 
-  Future<void> _sync(AppStore store, {bool chooseAgain = false}) async {
+  Future<void> _sync(
+    AppStore store, {
+    bool chooseAgain = false,
+    bool otherAccount = false,
+  }) async {
     setState(() => _syncing = true);
     final saved = store.isParent
         ? widget.kid.classroomCourseIds
         : widget.kid.selfClassroomCourseIds;
     final msg = await store.syncClassroom(
       widget.kid,
-      choose: chooseAgain || saved.isEmpty
+      otherAccount: otherAccount,
+      choose: chooseAgain || otherAccount || saved.isEmpty
           ? classPicker(context, widget.kid.name)
           : null,
     );
@@ -842,7 +861,8 @@ class _KidClassroomCardState extends State<KidClassroomCard> {
                         "teacher's announcements will show up here with reminders."
                   : 'Connected: $email'
                         '${kid.selfClassroomClasses.isEmpty ? '' : '\nClasses: ${kid.selfClassroomClasses.join(', ')}'}\n'
-                        'Checks by itself every day.',
+                        'Checks by itself every 2 hours. '
+                        '${lastCheckedText(store.lastClassroomSync(kid), store.now)}',
             ),
             const SizedBox(height: 8),
             FilledButton.tonalIcon(
@@ -927,3 +947,14 @@ ChooseCourses classPicker(BuildContext context, String kidName) =>
         );
       },
     );
+
+/// "Last checked 10:42 am", "Last checked yesterday".
+String lastCheckedText(DateTime? at, DateTime now) {
+  if (at == null) return '';
+  final today = DateTime(now.year, now.month, now.day);
+  final day = DateTime(at.year, at.month, at.day);
+  final time = formatMinute(at.hour * 60 + at.minute);
+  if (day == today) return 'Last checked $time.';
+  if (today.difference(day).inDays == 1) return 'Last checked yesterday $time.';
+  return 'Last checked ${formatYmd(ymdKey(at))}.';
+}

@@ -104,7 +104,15 @@ class AppStore extends ChangeNotifier {
   /// Classroom on their own devices.
   final Map<String, Map<String, dynamic>> _kidSchool = {};
   final Set<String> _kidSchoolIds = {};
-  String _deviceClassroomDay = '';
+  DateTime? _lastAutoClassroom;
+  bool _autoClassroomRunning = false;
+
+  /// When Classroom was last checked for each child on this phone.
+  DateTime? lastClassroomSync(Kid kid) {
+    final ms = _prefs.getInt('classroom_last_${kid.id}');
+    return ms == null ? null : DateTime.fromMillisecondsSinceEpoch(ms);
+  }
+
   Map<String, dynamic>? _familyDoc;
   String _listeningWeek = '';
   Timer? _ticker;
@@ -908,9 +916,12 @@ class AppStore extends ChangeNotifier {
       _announcedKey = noticeKey;
       Notifications.announceNotices(notices, (id) => kidById(id)?.name ?? '');
     }
-    if (!isParent && _deviceClassroomDay != today) {
-      _deviceClassroomDay = today;
-      _deviceClassroomSync();
+    // Classroom refreshes by itself when the app opens and every 2 hours
+    // while it is open.
+    if (_lastAutoClassroom == null ||
+        now.difference(_lastAutoClassroom!) >= const Duration(hours: 2)) {
+      _lastAutoClassroom = now;
+      _autoClassroomSync();
     }
     if (!isParent || _maintainedDay == today) return;
     _maintainedDay = today;
@@ -923,7 +934,6 @@ class AppStore extends ChangeNotifier {
     }
     if (updates.isNotEmpty) _write(_familyRef.update(updates));
     if (family.weekId != currentWeekId) _rollWeek();
-    _dailyClassroomSync();
   }
 
   Map<String, List<int>> _windowsAhead(PrayerSettings p) {
@@ -1225,6 +1235,7 @@ class AppStore extends ChangeNotifier {
     Kid kid, {
     bool interactive = true,
     ChooseCourses? choose,
+    bool otherAccount = false,
   }) async {
     try {
       final result = await ClassroomClient.fetch(
@@ -1234,11 +1245,15 @@ class AppStore extends ChangeNotifier {
           ...(isParent ? kid.classroomCourseIds : kid.selfClassroomCourseIds),
         },
         choose: interactive ? choose : null,
-        expectedEmail: interactive
+        expectedEmail: otherAccount
             ? null
             : (isParent ? kid.classroomEmail : kid.selfClassroomEmail),
       );
       if (result == null) return null;
+      await _prefs.setInt(
+        'classroom_last_${kid.id}',
+        now.millisecondsSinceEpoch,
+      );
       final updates = <String, Object?>{};
       var added = 0;
       for (final w in result.work) {
@@ -1312,23 +1327,27 @@ class AppStore extends ChangeNotifier {
     }
   }
 
-  /// Once a day on the parent's phone: refresh Classroom for children whose
-  /// school account is still signed in, without showing anything.
-  Future<void> _dailyClassroomSync() async {
-    if (!classroomEnabled || !ClassroomClient.supported) return;
-    for (final kid in family.kids.where((k) => k.classroomEmail != null)) {
-      await syncClassroom(kid, interactive: false);
+  /// Refreshes Classroom without showing anything, for every child whose
+  /// school account is still signed in on this phone: on a parent's phone
+  /// the accounts Mom connected, on a child's device the child's own.
+  Future<void> _autoClassroomSync() async {
+    if (!classroomEnabled ||
+        !ClassroomClient.supported ||
+        _autoClassroomRunning) {
+      return;
     }
-  }
-
-  /// Once a day on a child's device: refresh Classroom for children who
-  /// connected their school account here.
-  Future<void> _deviceClassroomSync() async {
-    if (!classroomEnabled || !ClassroomClient.supported) return;
-    for (final kid in visibleKids.where(
-      (k) => k.mayConnectClassroom && k.selfClassroomEmail != null,
-    )) {
-      await syncClassroom(kid, interactive: false);
+    _autoClassroomRunning = true;
+    try {
+      final kids = isParent
+          ? family.kids.where((k) => k.classroomEmail != null)
+          : visibleKids.where(
+              (k) => k.mayConnectClassroom && k.selfClassroomEmail != null,
+            );
+      for (final kid in kids.toList()) {
+        await syncClassroom(kid, interactive: false);
+      }
+    } finally {
+      _autoClassroomRunning = false;
     }
   }
 
